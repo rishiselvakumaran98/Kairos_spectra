@@ -6,8 +6,8 @@
   <title>KAIROS-SPECTRA</title>
   <style>
     body {
-      width: 320px;
-      min-height: 200px;
+      width: 340px;
+      min-height: 400px;
       padding: 16px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       margin: 0;
@@ -86,6 +86,165 @@
       padding-top: 12px;
       border-top: 1px solid #e5e7eb;
     }
+    
+    /* Settings Section */
+    .settings {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 2px solid #e5e7eb;
+    }
+    
+    .settings-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    
+    .settings-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+    
+    .vision-badge {
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #dbeafe;
+      color: #1e40af;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .api-key-section {
+      margin-bottom: 12px;
+    }
+    
+    .input-group {
+      position: relative;
+    }
+    
+    .input-label {
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 4px;
+      display: block;
+    }
+    
+    .input-wrapper {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    
+    #apiKeyInput {
+      flex: 1;
+      padding: 8px 32px 8px 10px;
+      font-size: 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      transition: all 0.2s;
+    }
+    
+    #apiKeyInput:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    #apiKeyInput:disabled {
+      background: #f9fafb;
+      color: #6b7280;
+      cursor: not-allowed;
+    }
+    
+    #apiKeyInput.has-value {
+      border-color: #10b981;
+    }
+    
+    .lock-btn {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      color: #6b7280;
+      font-size: 14px;
+      transition: color 0.2s;
+    }
+    
+    .lock-btn:hover {
+      color: #1a1a1a;
+    }
+    
+    .lock-btn.locked {
+      color: #3b82f6;
+    }
+    
+    .save-btn {
+      padding: 8px 12px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+    
+    .save-btn:hover {
+      background: #2563eb;
+    }
+    
+    .save-btn:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+    
+    .save-btn.saved {
+      background: #10b981;
+    }
+    
+    .api-status {
+      font-size: 10px;
+      color: #6b7280;
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .api-status.success {
+      color: #10b981;
+    }
+    
+    .api-status.error {
+      color: #ef4444;
+    }
+    
+    .help-text {
+      font-size: 10px;
+      color: #6b7280;
+      margin-top: 8px;
+      line-height: 1.4;
+    }
+    
+    .help-text a {
+      color: #3b82f6;
+      text-decoration: none;
+    }
+    
+    .help-text a:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
@@ -105,6 +264,42 @@
     <div class="stat">
       <div class="stat-label">Struggles</div>
       <div class="stat-value" id="struggles">0</div>
+    </div>
+  </div>
+  
+  <!-- Settings Section -->
+  <div class="settings">
+    <div class="settings-header">
+      <div class="settings-title">⚙️ Settings</div>
+      <div class="vision-badge">GPT-4V Vision</div>
+    </div>
+    
+    <div class="api-key-section">
+      <label class="input-label" for="apiKeyInput">
+        OpenAI API Key (for complex web apps)
+      </label>
+      
+      <div class="input-group">
+        <div class="input-wrapper">
+          <input 
+            type="password" 
+            id="apiKeyInput" 
+            placeholder="sk-..."
+            disabled
+          />
+          <button id="lockBtn" class="lock-btn locked" title="Unlock to edit">🔒</button>
+        </div>
+        <button id="saveBtn" class="save-btn" disabled>Save</button>
+      </div>
+      
+      <div id="apiStatus" class="api-status">
+        <span id="apiStatusText">Loading...</span>
+      </div>
+      
+      <div class="help-text">
+        Required for vision analysis on Voyager, Tableau, etc.
+        <a href="https://platform.openai.com/api-keys" target="_blank">Get API key →</a>
+      </div>
     </div>
   </div>
   

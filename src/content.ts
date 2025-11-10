@@ -7,11 +7,13 @@
  * Flow:
  * 1. PerceptionAgent monitors user interactions
  * 2. When struggle detected → DataAgent extracts data
- * 3. Results sent to background script for processing
+ * 3. If DOM extraction fails → VisionAgent uses GPT-4V screenshot analysis
+ * 4. Results sent to background script for processing
  */
 
 import { perceptionAgent } from './agents/PerceptionAgent';
 import { dataAgent } from './agents/DataAgent';
+import { visionAgent } from './agents/VisionAgent';
 import type { StruggleEvent, ChromeMessage } from './types';
 import { logger, createMessage, sendMessageToBackground } from './utils';
 
@@ -50,8 +52,34 @@ class KairosSpectraContentScript {
     });
 
     try {
-      // Extract data from involved elements
+      // Extract data from involved elements using DOM scraping
       const extractionResult = await dataAgent.extractFromStruggleEvent(event);
+
+      // If DOM extraction failed (no data extracted), fall back to vision analysis
+      if (extractionResult.extractedData.length === 0 && event.interactionHistory.length > 0) {
+        logger.info('ContentScript', 'DOM extraction failed, trying vision analysis');
+        
+        // Get last interaction position for cursor location
+        const lastInteraction = event.interactionHistory[event.interactionHistory.length - 1];
+        
+        if (lastInteraction.position) {
+          const mousePosition = lastInteraction.position;
+          const elementSelector = lastInteraction.target.element;
+
+          // Use vision agent to analyze screenshot
+          const visionData = await visionAgent.analyzeStrugglePoint(mousePosition, elementSelector);
+          
+          if (visionData) {
+            logger.info('ContentScript', 'Vision analysis succeeded', {
+              type: visionData.type,
+              confidence: visionData.confidence,
+            });
+            extractionResult.extractedData.push(visionData);
+          } else {
+            logger.warn('ContentScript', 'Vision analysis also failed');
+          }
+        }
+      }
 
       // Log detailed extraction results to page console (for Phase 1 debugging)
       this.logExtractionResults(event, extractionResult);

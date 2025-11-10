@@ -47,6 +47,10 @@ class KairosSpectraBackground {
         sendResponse({ received: true });
         break;
 
+      case 'CAPTURE_SCREENSHOT':
+        this.handleCaptureScreenshot(sender.tab?.id, sendResponse);
+        return true; // Keep channel open for async response
+
       case 'AGENT_STATE_UPDATE':
         if (message.payload.contentScriptReady) {
           logger.info('Background', 'Content script ready', {
@@ -68,6 +72,32 @@ class KairosSpectraBackground {
     }
 
     return true;
+  }
+
+  private handleCaptureScreenshot(
+    tabId: number | undefined,
+    sendResponse: (response: any) => void
+  ): void {
+    if (!tabId) {
+      sendResponse({ error: 'No tab ID' });
+      return;
+    }
+
+    chrome.tabs.captureVisibleTab(
+      { format: 'png', quality: 100 },
+      (dataUrl) => {
+        if (chrome.runtime.lastError) {
+          logger.error('Background', 'Screenshot capture failed', chrome.runtime.lastError);
+          sendResponse({ error: chrome.runtime.lastError.message });
+        } else {
+          logger.debug('Background', 'Screenshot captured', {
+            size: dataUrl.length,
+            tabId,
+          });
+          sendResponse({ screenshot: dataUrl });
+        }
+      }
+    );
   }
 
   private handleStruggleDetected(

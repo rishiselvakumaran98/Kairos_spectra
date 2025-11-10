@@ -25,6 +25,8 @@ module.exports = {
     path: path.resolve(__dirname, 'dist'),
     clean: true
   },
+  // CRITICAL: Chrome extensions don't allow eval() due to CSP
+  devtool: 'cheap-source-map', // Use source maps without eval
   plugins: [
     new CopyWebpackPlugin({
       patterns: [

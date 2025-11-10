@@ -105,7 +105,8 @@ export type MessageType =
   | 'DATA_EXTRACTION_REQUEST'
   | 'DATA_EXTRACTION_COMPLETE'
   | 'PERCEPTION_STATUS'
-  | 'AGENT_STATE_UPDATE';
+  | 'AGENT_STATE_UPDATE'
+  | 'CAPTURE_SCREENSHOT';
 
 export interface ChromeMessage<T = any> {
   type: MessageType;

@@ -27,16 +27,22 @@ KAIROS-SPECTRA creates a "thinking scaffold" for analysis by:
   - Repetitive movement between elements
   - Rapid switching behavior
 - ✅ **DataAgent**: Extracts structured data from DOM elements
-  - Table extraction
-  - Chart metadata extraction
+  - Table extraction (HTML `<table>` and ARIA `role="grid"`)
+  - Chart metadata extraction (Canvas, SVG)
   - List and text data extraction
   - Confidence scoring for all extractions
+- ✅ **VisionAgent (NEW!)**: GPT-4V fallback for complex web apps
+  - Screenshot capture with cursor position
+  - Vision-based element identification
+  - Works on Canvas/SVG-heavy apps (Voyager, Tableau, Looker)
+  - Automatic fallback when DOM extraction fails
 
 **Key Features:**
 - Non-intrusive passive monitoring
 - Chrome message passing architecture (adapted from COWPILOT)
 - Struggle detection with confidence scores (G11: transparency)
 - Efficient event buffering with sliding window
+- **Hybrid extraction**: DOM-first, vision-fallback for robustness
 
 ### 🚧 Phase 2: The "Guiding" Layer (Nov 11-14)
 
@@ -66,11 +72,13 @@ KAIROS-SPECTRA creates a "thinking scaffold" for analysis by:
 ## 🏗️ Architecture
 
 ```
+```
 KAIROS-SPECTRA/
 ├── src/
 │   ├── agents/
 │   │   ├── PerceptionAgent.ts    # User interaction monitoring
 │   │   ├── DataAgent.ts           # Data extraction from DOM
+│   │   ├── VisionAgent.ts         # GPT-4V vision fallback (NEW!)
 │   │   └── (Future phases...)
 │   ├── background.ts              # Extension service worker
 │   ├── content.ts                 # Content script coordinator
@@ -79,6 +87,7 @@ KAIROS-SPECTRA/
 │   ├── types.ts                   # TypeScript definitions
 │   ├── constants.ts               # Configuration values
 │   └── utils.ts                   # Shared utilities
+```
 ├── manifest.json                  # Chrome extension manifest
 ├── webpack.config.js              # Build configuration
 └── package.json                   # Dependencies
@@ -91,6 +100,7 @@ KAIROS-SPECTRA/
 - Node.js 18+
 - npm or yarn
 - Google Chrome (latest)
+- **OpenAI API key** (for GPT-4V vision fallback - optional but recommended)
 
 ### Setup
 
@@ -109,6 +119,15 @@ For development with auto-rebuild:
 ```bash
 npm run dev
 ```
+
+3. **(Optional) Set OpenAI API key for vision analysis:**
+```javascript
+// In Chrome DevTools console:
+chrome.storage.sync.set({
+  openai_api_key: "sk-your-actual-key-here"
+});
+```
+**Note:** Vision is only needed for complex web apps (Voyager, Tableau, Looker). DOM extraction works fine for simple HTML dashboards without an API key.
 
 3. **Load in Chrome:**
    - Open Chrome and navigate to `chrome://extensions/`
