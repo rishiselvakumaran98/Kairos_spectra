@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KAIROS-SPECTRA</title>
+  <style>
+    body {
+      width: 320px;
+      min-height: 200px;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+    }
+    
+    h1 {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 0 0 12px 0;
+      color: #1a1a1a;
+    }
+    
+    .subtitle {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 16px;
+    }
+    
+    .status {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+    }
+    
+    .status.active {
+      background: #dcfce7;
+      border-color: #86efac;
+    }
+    
+    .status-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    
+    .status-value {
+      font-size: 14px;
+      font-weight: 500;
+      color: #1a1a1a;
+    }
+    
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    
+    .stat {
+      padding: 8px;
+      border-radius: 6px;
+      background: #f9fafb;
+    }
+    
+    .stat-label {
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 2px;
+    }
+    
+    .stat-value {
+      font-size: 20px;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+    
+    .footer {
+      font-size: 11px;
+      color: #999;
+      text-align: center;
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #e5e7eb;
+    }
+  </style>
+</head>
+<body>
+  <h1>KAIROS-SPECTRA</h1>
+  <div class="subtitle">Proactive Visual Analytics Assistant</div>
+  
+  <div id="status" class="status">
+    <div class="status-label">Status</div>
+    <div class="status-value">Initializing...</div>
+  </div>
+  
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">Interactions</div>
+      <div class="stat-value" id="interactions">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Struggles</div>
+      <div class="stat-value" id="struggles">0</div>
+    </div>
+  </div>
+  
+  <div class="footer">
+    Phase 1: Sensing Layer Active<br>
+    Research Prototype v0.1.0
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

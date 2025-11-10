@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KAIROS-SPECTRA Test Dashboard</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 40px;
+      background: #f9fafb;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+      color: #1a1a1a;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 40px;
+      font-size: 14px;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+      max-width: 1400px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .card h2 {
+      margin-bottom: 16px;
+      font-size: 18px;
+      color: #1a1a1a;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th {
+      background: #f3f4f6;
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+      color: #374151;
+      border-bottom: 2px solid #e5e7eb;
+    }
+
+    td {
+      padding: 12px;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 14px;
+    }
+
+    .chart-placeholder {
+      width: 100%;
+      height: 300px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 18px;
+    }
+
+    .chart-placeholder.green {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    .chart-placeholder.orange {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    .metric {
+      background: #f9fafb;
+      padding: 16px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .metric-value {
+      font-size: 32px;
+      font-weight: 700;
+      color: #1a1a1a;
+      margin-bottom: 4px;
+    }
+
+    .metric-label {
+      font-size: 12px;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .instructions {
+      margin-top: 40px;
+      padding: 20px;
+      background: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      border-radius: 8px;
+    }
+
+    .instructions h3 {
+      margin-bottom: 12px;
+      color: #92400e;
+    }
+
+    .instructions ul {
+      margin-left: 20px;
+      color: #78350f;
+    }
+
+    .instructions li {
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>KAIROS-SPECTRA Test Dashboard</h1>
+  <p class="subtitle">Interact with data elements to trigger struggle detection</p>
+
+  <div class="dashboard">
+    <div class="card">
+      <h2>📊 Sales Data (Q1 2025)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Revenue</th>
+            <th>Growth</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Product A</td>
+            <td>$125,430</td>
+            <td>+12.5%</td>
+          </tr>
+          <tr>
+            <td>Product B</td>
+            <td>$98,720</td>
+            <td>-3.2%</td>
+          </tr>
+          <tr>
+            <td>Product C</td>
+            <td>$245,890</td>
+            <td>+28.7%</td>
+          </tr>
+          <tr>
+            <td>Product D</td>
+            <td>$67,340</td>
+            <td>+5.1%</td>
+          </tr>
+          <tr>
+            <td>Product E</td>
+            <td>$189,560</td>
+            <td>+15.3%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>📈 Revenue Trends</h2>
+      <div class="chart-placeholder">
+        Line Chart: Revenue Over Time
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🗺️ Regional Performance</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Region</th>
+            <th>Sales</th>
+            <th>Customers</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>North America</td>
+            <td>$456,789</td>
+            <td>1,234</td>
+          </tr>
+          <tr>
+            <td>Europe</td>
+            <td>$323,456</td>
+            <td>987</td>
+          </tr>
+          <tr>
+            <td>Asia Pacific</td>
+            <td>$567,890</td>
+            <td>1,567</td>
+          </tr>
+          <tr>
+            <td>Latin America</td>
+            <td>$123,456</td>
+            <td>456</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>📊 Market Share</h2>
+      <div class="chart-placeholder green">
+        Pie Chart: Market Distribution
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🎯 Customer Segments</h2>
+      <div class="chart-placeholder orange">
+        Bar Chart: Customer Categories
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>💰 Key Metrics</h2>
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-value">$1.2M</div>
+          <div class="metric-label">Total Revenue</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value">4,244</div>
+          <div class="metric-label">Customers</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value">+18.3%</div>
+          <div class="metric-label">Growth</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="instructions">
+    <h3>🧪 Testing Instructions</h3>
+    <ul>
+      <li><strong>Test 1 (Prolonged Hesitation):</strong> Hover over a table or chart, then stop moving your mouse for 3+ seconds</li>
+      <li><strong>Test 2 (Repetitive Movement):</strong> Click on the Sales Data table, then click on Revenue Trends chart, repeat 3+ times</li>
+      <li><strong>Test 3 (Data Extraction):</strong> When struggle is detected, check DevTools console for extracted data</li>
+      <li><strong>Monitor Activity:</strong> Click the KAIROS-SPECTRA extension icon to see live stats</li>
+      <li><strong>Debug Logs:</strong> Open DevTools Console (F12) to see detailed interaction and struggle detection logs</li>
+    </ul>
+  </div>
+</body>
+</html>
