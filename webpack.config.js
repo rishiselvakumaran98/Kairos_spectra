@@ -35,6 +35,7 @@ module.exports = {
         { from: 'src/popup.html', to: 'popup.html' },
         { from: 'src/content.css', to: 'content.css' },
         { from: 'vega-sandbox.html', to: 'vega-sandbox.html' },
+        { from: 'vega-sandbox-init.js', to: 'vega-sandbox-init.js' },
         { from: 'icons', to: 'icons', noErrorOnMissing: true }
       ]
     })

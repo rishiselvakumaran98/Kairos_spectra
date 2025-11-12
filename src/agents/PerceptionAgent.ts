@@ -244,7 +244,12 @@ export class PerceptionAgent {
   }
 
   private handleScroll(event: Event): void {
-    const target = event.target as HTMLElement;
+    const target = event.target as HTMLElement | Document | Window;
+    
+    // Scroll events on document/window don't provide useful target info
+    if (target === document || target === window || !(target instanceof HTMLElement)) {
+      return;
+    }
     
     // Ignore interactions with KAIROS UI elements to prevent infinite loops
     if (this.shouldIgnoreElement(target)) {

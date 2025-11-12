@@ -28,84 +28,10 @@
 <body>
   <div id="vis"></div>
   
+  <!-- Load Vega bundle first -->
   <script src="vega-sandbox-bundle.js"></script>
-  <script>
-    // Check if Vega libraries loaded successfully
-    window.addEventListener('load', () => {
-      console.log('[Vega Sandbox] Window loaded');
-      console.log('[Vega Sandbox] vegaEmbed available:', typeof window.vegaEmbed !== 'undefined');
-      
-      if (typeof window.vegaEmbed === 'undefined') {
-        console.error('[Vega Sandbox] vegaEmbed is not defined! Bundle may have failed to load.');
-        document.getElementById('vis').innerHTML = `
-          <div class="error">
-            <strong>Script Loading Error:</strong><br>
-            Vega libraries failed to load from bundle. Check console for errors.
-          </div>
-        `;
-      } else {
-        console.log('[Vega Sandbox] Vega bundle loaded successfully');
-        // Notify parent that sandbox is ready
-        window.parent.postMessage({
-          type: 'VEGA_SANDBOX_READY',
-        }, '*');
-      }
-    });
-    
-    // Listen for messages from parent content script
-    window.addEventListener('message', async (event) => {
-      const { type, spec } = event.data;
-      
-      if (type === 'RENDER_VEGA') {
-        try {
-          console.log('[Vega Sandbox] Received render request');
-          
-          if (typeof window.vegaEmbed === 'undefined') {
-            throw new Error('vegaEmbed is not defined - bundle failed to load');
-          }
-          
-          const container = document.getElementById('vis');
-          container.innerHTML = ''; // Clear previous chart
-          
-          console.log('[Vega Sandbox] Rendering spec:', spec);
-          
-          await window.vegaEmbed(container, spec, {
-            actions: {
-              export: true,
-              source: false,
-              compiled: false,
-              editor: false,
-            },
-            renderer: 'canvas',
-          });
-          
-          console.log('[Vega Sandbox] Render succeeded');
-          
-          // Notify parent that rendering succeeded
-          window.parent.postMessage({
-            type: 'VEGA_RENDER_SUCCESS',
-          }, '*');
-          
-        } catch (error) {
-          console.error('[Vega Sandbox] Vega rendering error:', error);
-          
-          // Show error in iframe
-          const container = document.getElementById('vis');
-          container.innerHTML = `
-            <div class="error">
-              <strong>Chart Rendering Error:</strong><br>
-              ${error.message || 'Unknown error'}
-            </div>
-          `;
-          
-          // Notify parent of error
-          window.parent.postMessage({
-            type: 'VEGA_RENDER_ERROR',
-            error: error.message || 'Unknown error',
-          }, '*');
-        }
-      }
-    });
-  </script>
+  
+  <!-- Load initialization script (no inline scripts for CSP compliance) -->
+  <script src="vega-sandbox-init.js"></script>
 </body>
 </html>
