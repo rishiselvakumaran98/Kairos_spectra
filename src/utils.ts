@@ -189,13 +189,31 @@ export function createMessage<T>(
 
 export function sendMessageToBackground<T>(message: ChromeMessage<T>): Promise<any> {
   return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage(message, (response) => {
-      if (chrome.runtime.lastError) {
-        reject(chrome.runtime.lastError);
-      } else {
-        resolve(response);
-      }
-    });
+    // Check if extension context is still valid
+    if (!chrome.runtime?.id) {
+      reject(new Error('Extension context invalidated - extension was reloaded'));
+      return;
+    }
+
+    try {
+      chrome.runtime.sendMessage(message, (response) => {
+        if (chrome.runtime.lastError) {
+          const error = chrome.runtime.lastError;
+          
+          // Handle specific "Extension context invalidated" error gracefully
+          if (error.message?.includes('Extension context invalidated')) {
+            logger.warn('Utils', 'Extension was reloaded. Page refresh recommended.');
+            reject(new Error('Extension context invalidated - please reload this page'));
+          } else {
+            reject(error);
+          }
+        } else {
+          resolve(response);
+        }
+      });
+    } catch (error) {
+      reject(error);
+    }
   });
 }
 

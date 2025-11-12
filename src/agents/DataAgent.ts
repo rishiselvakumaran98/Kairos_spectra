@@ -69,10 +69,20 @@ export class DataAgent {
 
     try {
       const extractedData: ExtractedData[] = [];
+      const processedElements = new Set<HTMLElement>();
 
-      // Extract data from each involved element
+      // CRITICAL FIX: Look for parent tables first when cells are detected
       for (const element of struggleEvent.involvedElements) {
-        const data = await this.extractFromElement(element);
+        // If this is a table cell, find the parent table instead
+        const dataElement = this.findDataContainer(element);
+        
+        // Skip if we already processed this element
+        if (processedElements.has(dataElement)) {
+          continue;
+        }
+        processedElements.add(dataElement);
+        
+        const data = await this.extractFromElement(dataElement);
         if (data) {
           extractedData.push(data);
         }
@@ -80,7 +90,15 @@ export class DataAgent {
 
       // Also scan nearby elements for additional context
       const nearbyData = await this.extractNearbyData(struggleEvent.involvedElements);
-      extractedData.push(...nearbyData);
+      nearbyData.forEach(data => {
+        // Avoid duplicates
+        const isDuplicate = extractedData.some(
+          existing => existing.sourceElement === data.sourceElement
+        );
+        if (!isDuplicate) {
+          extractedData.push(data);
+        }
+      });
 
       const result: DataExtractionResult = {
         struggleEventId: struggleEvent.id,
@@ -100,6 +118,7 @@ export class DataAgent {
       logger.data('Extraction complete', {
         eventId: struggleEvent.id,
         dataExtracted: extractedData.length,
+        types: extractedData.map(d => d.type).join(', '),
         durationMs: result.metadata.extractionDurationMs,
       });
 
@@ -197,6 +216,51 @@ export class DataAgent {
   // ========================================================================
   // Data Type Detection
   // ========================================================================
+
+  /**
+   * Find the actual data container element
+   * If user hovers over a table cell, find the parent table
+   * If user hovers over a chart element, find the parent chart container
+   */
+  private findDataContainer(element: HTMLElement): HTMLElement {
+    // Check if element is a table cell - traverse up to find table
+    if (element.tagName === 'TD' || element.tagName === 'TH' || element.tagName === 'TR') {
+      let current = element;
+      while (current && current !== document.body) {
+        if (current.tagName === 'TABLE') {
+          logger.debug('DataAgent', 'Found parent table for cell', {
+            cell: element.tagName,
+            table: getElementSelector(current),
+          });
+          return current;
+        }
+        current = current.parentElement as HTMLElement;
+      }
+    }
+
+    // Check if element is inside a role-based grid
+    const gridParent = element.closest('[role="grid"], [role="table"]');
+    if (gridParent) {
+      logger.debug('DataAgent', 'Found parent grid/table via role', {
+        element: element.tagName,
+        grid: getElementSelector(gridParent as HTMLElement),
+      });
+      return gridParent as HTMLElement;
+    }
+
+    // Check if element is inside a chart container
+    const chartParent = element.closest('svg, canvas, [class*="chart"], [class*="plot"], [class*="graph"]');
+    if (chartParent) {
+      logger.debug('DataAgent', 'Found parent chart container', {
+        element: element.tagName,
+        chart: getElementSelector(chartParent as HTMLElement),
+      });
+      return chartParent as HTMLElement;
+    }
+
+    // Return original element if no container found
+    return element;
+  }
 
   private detectDataType(element: HTMLElement): DataType {
     const tagName = element.tagName.toLowerCase();

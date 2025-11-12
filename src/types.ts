@@ -1,6 +1,7 @@
 /**
  * KAIROS-SPECTRA Type Definitions
  * Phase 1: Perception & Data Layer
+ * Phase 2: Guiding Layer
  */
 
 // ============================================================================
@@ -151,4 +152,70 @@ export interface BoundingBox {
   left: number;
   width: number;
   height: number;
+}
+
+// ============================================================================
+// Phase 2: Orchestrator & Guidance Types
+// Based on FlowForge (Hao et al.) hierarchical abstraction levels
+// ============================================================================
+
+/**
+ * FlowForge-inspired hierarchical UI levels
+ * Level 1: Task Planning (analytical goals)
+ * Level 2: Agent Assignment (viz type selection)
+ * Level 3: Agent Optimization (refinement loop)
+ */
+export type GuidanceLevel = 'TASK_PLANNING' | 'VIZ_SELECTION' | 'REFINEMENT';
+
+/**
+ * Analytical goals presented at Task Planning level
+ */
+export type AnalyticalGoal = 
+  | 'compare_trends'
+  | 'analyze_distribution'
+  | 'find_outliers'
+  | 'correlation_analysis'
+  | 'custom';
+
+/**
+ * Visualization types for Agent Assignment level
+ */
+export type VizType = 
+  | 'line_chart'
+  | 'bar_chart'
+  | 'scatter_plot'
+  | 'histogram'
+  | 'box_plot'
+  | 'heatmap';
+
+/**
+ * OrchestratorAgent state machine
+ */
+export interface OrchestratorState {
+  currentLevel: GuidanceLevel;
+  extractionResult: DataExtractionResult | null;
+  selectedGoal: AnalyticalGoal | null;
+  selectedVizType: VizType | null;
+  currentVizSpec: any | null; // Vega-Lite spec
+  refinementHistory: string[];
+  isUIVisible: boolean;
+}
+
+/**
+ * Context inference for Level 1 UI
+ * Smart messages based on extracted data
+ */
+export interface InferredContext {
+  message: string; // e.g., "I see you're exploring a scatter plot..."
+  dataElements: string[]; // e.g., ["Sales Table", "Profit Chart"]
+  confidence: number;
+}
+
+/**
+ * Refinement request from user at Level 3
+ */
+export interface RefinementRequest {
+  userPrompt: string;
+  currentSpec: any;
+  originalData: ExtractedData[];
 }

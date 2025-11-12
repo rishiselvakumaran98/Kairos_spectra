@@ -70,6 +70,7 @@ export class VisionAgent {
           dataDescription: analysis.dataDescription,
           possibleActions: analysis.possibleActions,
           extractedVia: 'vision',
+          screenshot, // CRITICAL: Store screenshot for later use
           mousePosition,
           url: window.location.href,
           timestamp: Date.now(),
@@ -323,6 +324,270 @@ Respond in JSON format:
     this.apiKey = apiKey;
     await chrome.storage.sync.set({ openai_api_key: apiKey });
     logger.info('VisionAgent', 'API key updated');
+  }
+
+  // ============================================================================
+  // NEW: Chart Analysis Methods
+  // ============================================================================
+
+  /**
+   * Analyze a snipped/cropped chart region
+   */
+  public async analyzeChartSnippet(
+    screenshotData: string,
+    boundingBox: { x: number; y: number; width: number; height: number }
+  ): Promise<{
+    chartType: string;
+    insights: string[];
+    trends: string[];
+    suggestions: string[];
+  } | null> {
+    try {
+      logger.info('VisionAgent', 'Analyzing chart snippet', { boundingBox });
+
+      if (!this.apiKey) {
+        logger.warn('VisionAgent', 'No API key configured');
+        return null;
+      }
+
+      // Crop the screenshot to the bounding box
+      const croppedImage = await this.cropImage(screenshotData, boundingBox);
+
+      // Send to GPT-4V with analysis-focused prompt
+      const response = await fetch(this.apiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: `You are an expert data analyst. Analyze this chart/visualization and provide:
+
+1. Chart Type: What type of chart is this? (bar chart, line chart, scatter plot, etc.)
+2. Key Insights: What are 3-5 key insights from this visualization?
+3. Trends: What trends or patterns do you observe?
+4. Suggestions: What additional analysis or questions would be valuable?
+
+Format your response as JSON:
+{
+  "chartType": "...",
+  "insights": ["...", "...", "..."],
+  "trends": ["...", "...", "..."],
+  "suggestions": ["...", "...", "..."]
+}`,
+                },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: croppedImage,
+                    detail: 'high',
+                  },
+                },
+              ],
+            },
+          ],
+          max_tokens: 1000,
+          temperature: 0.3,
+        }),
+      });
+
+      if (!response.ok) {
+        logger.error('VisionAgent', 'GPT-4V API error', {
+          status: response.status,
+          statusText: response.statusText,
+        });
+        return null;
+      }
+
+      const data = await response.json();
+      const content = data.choices[0]?.message?.content;
+
+      if (!content) {
+        logger.warn('VisionAgent', 'Empty response from GPT-4V');
+        return null;
+      }
+
+      // Parse JSON response
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        logger.warn('VisionAgent', 'Could not extract JSON from response');
+        return null;
+      }
+
+      const analysisResult = JSON.parse(jsonMatch[0]);
+
+      logger.info('VisionAgent', 'Chart snippet analyzed successfully');
+      return analysisResult;
+
+    } catch (error) {
+      logger.error('VisionAgent', 'Failed to analyze chart snippet', error);
+      return null;
+    }
+  }
+
+  /**
+   * Answer a specific question about a chart using GPT-4V
+   */
+  public async answerChartQuestion(
+    question: string,
+    chartData: any
+  ): Promise<{
+    response: string;
+    followUpSuggestions: string[];
+  } | null> {
+    try {
+      logger.info('VisionAgent', 'Answering chart question', { question, chartData });
+
+      if (!this.apiKey) {
+        logger.warn('VisionAgent', 'No API key configured');
+        return null;
+      }
+
+      // Extract chart information - handle both ExtractedData and raw data formats
+      const chartType = chartData.data?.chartType || chartData.chartType || 'visualization';
+      const dataDescription = chartData.data?.dataDescription || chartData.dataDescription || '';
+      
+      // Try multiple paths to find the screenshot
+      const chartImage = 
+        chartData.data?.screenshot ||  // From ExtractedData.data.screenshot
+        chartData.screenshot ||         // From raw data
+        chartData.data?.data?.screenshot; // Nested structure
+
+      if (!chartImage) {
+        logger.warn('VisionAgent', 'No chart image available for question answering', {
+          chartDataKeys: Object.keys(chartData),
+          dataKeys: chartData.data ? Object.keys(chartData.data) : 'no data property'
+        });
+        return null;
+      }
+
+      logger.info('VisionAgent', 'Found chart image, sending to GPT-4V');
+
+      // Send question to GPT-4V with chart context
+      const response = await fetch(this.apiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: `You are a helpful data analysis assistant. The user is looking at a ${chartType}${dataDescription ? ` showing ${dataDescription}` : ''}.
+
+User's question: "${question}"
+
+Please provide:
+1. A clear, concise answer to their question based on what you see in the chart
+2. 2-3 related follow-up questions they might want to ask
+
+Format your response as JSON:
+{
+  "response": "Your answer here...",
+  "followUpSuggestions": ["Question 1?", "Question 2?", "Question 3?"]
+}`,
+                },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: chartImage,
+                    detail: 'high',
+                  },
+                },
+              ],
+            },
+          ],
+          max_tokens: 800,
+          temperature: 0.5,
+        }),
+      });
+
+      if (!response.ok) {
+        logger.error('VisionAgent', 'GPT-4V API error', {
+          status: response.status,
+          statusText: response.statusText,
+        });
+        return null;
+      }
+
+      const data = await response.json();
+      const content = data.choices[0]?.message?.content;
+
+      if (!content) {
+        logger.warn('VisionAgent', 'Empty response from GPT-4V');
+        return null;
+      }
+
+      // Parse JSON response
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        logger.warn('VisionAgent', 'Could not extract JSON from response');
+        return null;
+      }
+
+      const answerResult = JSON.parse(jsonMatch[0]);
+
+      logger.info('VisionAgent', 'Chart question answered successfully');
+      return answerResult;
+
+    } catch (error) {
+      logger.error('VisionAgent', 'Failed to answer chart question', error);
+      return null;
+    }
+  }
+
+  /**
+   * Crop image to bounding box
+   */
+  private async cropImage(
+    imageData: string,
+    boundingBox: { x: number; y: number; width: number; height: number }
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = boundingBox.width;
+        canvas.height = boundingBox.height;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Could not get canvas context'));
+          return;
+        }
+
+        // Draw cropped region
+        ctx.drawImage(
+          img,
+          boundingBox.x,
+          boundingBox.y,
+          boundingBox.width,
+          boundingBox.height,
+          0,
+          0,
+          boundingBox.width,
+          boundingBox.height
+        );
+
+        // Convert to data URL
+        resolve(canvas.toDataURL('image/png'));
+      };
+      
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = imageData;
+    });
   }
 }
 

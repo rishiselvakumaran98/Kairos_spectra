@@ -31,7 +31,7 @@ KAIROS-SPECTRA creates a "thinking scaffold" for analysis by:
   - Chart metadata extraction (Canvas, SVG)
   - List and text data extraction
   - Confidence scoring for all extractions
-- ✅ **VisionAgent (NEW!)**: GPT-4V fallback for complex web apps
+- ✅ **VisionAgent**: GPT-4V fallback for complex web apps
   - Screenshot capture with cursor position
   - Vision-based element identification
   - Works on Canvas/SVG-heavy apps (Voyager, Tableau, Looker)
@@ -44,15 +44,32 @@ KAIROS-SPECTRA creates a "thinking scaffold" for analysis by:
 - Efficient event buffering with sliding window
 - **Hybrid extraction**: DOM-first, vision-fallback for robustness
 
-### 🚧 Phase 2: The "Guiding" Layer (Nov 11-14)
+### ✅ Phase 2: The "Guiding" Layer (COMPLETE)
 
-**Planned Components:**
-- OrchestratorAgent: Main controller managing UI and agent state
-- Hierarchical Abstraction UI (inspired by FlowForge):
-  - Level 1: Task Planning (analytical goals)
-  - Level 2: Agent Assignment (visualization types)
-  - Level 3: Refinement (iterative improvement)
-- VisualizationAgent: Generates Vega-Lite specifications
+**Built:** Nov 10, 2025
+
+**Components:**
+- ✅ **OrchestratorAgent**: Main controller managing UI state machine and agent coordination
+  - Implements FlowForge hierarchical abstraction levels
+  - State management: TASK_PLANNING → VIZ_SELECTION → REFINEMENT
+  - Context inference from extracted data
+- ✅ **HierarchicalGuidanceUI**: COWPILOT-style floating UI manager
+  - Level 1: Task Planning (Compare Trends, Analyze Distribution, Find Outliers)
+  - Level 2: Viz Selection (Line Chart, Bar Chart, Scatter Plot, etc.)
+  - Level 3: Refinement Loop (natural language chart editing)
+  - Non-intrusive floating panel with smooth animations
+- ✅ **VisualizationAgent**: Vega-Lite chart generator
+  - Converts ExtractedData → Vega-Lite JSON specs
+  - Bar charts, line charts, scatter plots
+  - Keyword-based refinement (e.g., "make this a stacked bar chart")
+  - Real-time chart updates via vega-embed
+
+**Key Features:**
+- Proactive guidance triggers automatically on struggle detection
+- Three-level hierarchical abstraction reduces cognitive load
+- Natural language refinement (Amershi G9: support efficient correction)
+- Floating UI preserves user workflow (COWPILOT pattern)
+- No page reload required - all updates in-place
 
 ### 🚧 Phase 3: The "Trust & Transparency" Layer (Nov 15-19)
 
@@ -76,21 +93,23 @@ KAIROS-SPECTRA creates a "thinking scaffold" for analysis by:
 KAIROS-SPECTRA/
 ├── src/
 │   ├── agents/
-│   │   ├── PerceptionAgent.ts    # User interaction monitoring
-│   │   ├── DataAgent.ts           # Data extraction from DOM
-│   │   ├── VisionAgent.ts         # GPT-4V vision fallback (NEW!)
-│   │   └── (Future phases...)
-│   ├── background.ts              # Extension service worker
-│   ├── content.ts                 # Content script coordinator
-│   ├── popup.ts                   # Extension popup UI
-│   ├── injected.ts                # Page-level script
-│   ├── types.ts                   # TypeScript definitions
-│   ├── constants.ts               # Configuration values
-│   └── utils.ts                   # Shared utilities
-```
-├── manifest.json                  # Chrome extension manifest
-├── webpack.config.js              # Build configuration
-└── package.json                   # Dependencies
+│   │   ├── PerceptionAgent.ts     # User interaction monitoring
+│   │   ├── DataAgent.ts            # Data extraction from DOM
+│   │   ├── VisionAgent.ts          # GPT-4V vision fallback
+│   │   ├── OrchestratorAgent.ts    # Phase 2: Main controller
+│   │   └── VisualizationAgent.ts   # Phase 2: Vega-Lite generator
+│   ├── ui/
+│   │   └── HierarchicalGuidanceUI.ts  # Phase 2: Floating UI manager
+│   ├── background.ts               # Extension service worker
+│   ├── content.ts                  # Content script coordinator
+│   ├── popup.ts                    # Extension popup UI
+│   ├── injected.ts                 # Page-level script
+│   ├── types.ts                    # TypeScript definitions
+│   ├── constants.ts                # Configuration values
+│   └── utils.ts                    # Shared utilities
+├── manifest.json                   # Chrome extension manifest
+├── webpack.config.js               # Build configuration
+└── package.json                    # Dependencies (includes vega-lite, vega-embed)
 ```
 
 ## 🚀 Installation & Development

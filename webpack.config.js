@@ -6,7 +6,8 @@ module.exports = {
     background: './src/background.ts',
     content: './src/content.ts',
     injected: './src/injected.ts',
-    popup: './src/popup.ts'
+    popup: './src/popup.ts',
+    'vega-sandbox-bundle': './src/vega-sandbox-bundle.ts'
   },
   module: {
     rules: [
@@ -33,6 +34,7 @@ module.exports = {
         { from: 'manifest.json', to: 'manifest.json' },
         { from: 'src/popup.html', to: 'popup.html' },
         { from: 'src/content.css', to: 'content.css' },
+        { from: 'vega-sandbox.html', to: 'vega-sandbox.html' },
         { from: 'icons', to: 'icons', noErrorOnMissing: true }
       ]
     })

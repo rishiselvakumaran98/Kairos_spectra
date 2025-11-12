@@ -98,6 +98,35 @@ export class PerceptionAgent {
     logger.info('PerceptionAgent', 'Stopped monitoring');
   }
 
+  /**
+   * Temporarily pause struggle detection (e.g., while guidance UI is active)
+   * Unlike stop(), this doesn't remove event listeners - just stops analysis
+   */
+  public pause(): void {
+    if (!this.state.isActive) {
+      return;
+    }
+
+    this.state.isActive = false;
+    this.stopHesitationDetection();
+    
+    logger.info('PerceptionAgent', 'Paused struggle detection');
+  }
+
+  /**
+   * Resume struggle detection after pause
+   */
+  public resume(): void {
+    if (this.state.isActive) {
+      return; // Already active
+    }
+
+    this.state.isActive = true;
+    this.startHesitationDetection();
+    
+    logger.info('PerceptionAgent', 'Resumed struggle detection');
+  }
+
   public getState(): PerceptionAgentState {
     return { ...this.state };
   }
@@ -156,6 +185,11 @@ export class PerceptionAgent {
   private handleMouseMove(event: MouseEvent): void {
     const currentPosition: Point = { x: event.clientX, y: event.clientY };
     
+    // Ignore interactions with KAIROS UI elements to prevent infinite loops
+    if (this.shouldIgnoreElement(event.target as HTMLElement)) {
+      return;
+    }
+    
     // Check for significant movement
     if (this.lastMousePosition) {
       const distance = calculateDistance(this.lastMousePosition, currentPosition);
@@ -179,6 +213,11 @@ export class PerceptionAgent {
 
   private handleClick(event: MouseEvent): void {
     const target = event.target as HTMLElement;
+    
+    // Ignore interactions with KAIROS UI elements to prevent infinite loops
+    if (this.shouldIgnoreElement(target)) {
+      return;
+    }
     
     this.recordInteraction({
       type: 'click',
@@ -205,10 +244,17 @@ export class PerceptionAgent {
   }
 
   private handleScroll(event: Event): void {
+    const target = event.target as HTMLElement;
+    
+    // Ignore interactions with KAIROS UI elements to prevent infinite loops
+    if (this.shouldIgnoreElement(target)) {
+      return;
+    }
+    
     this.recordInteraction({
       type: 'scroll',
       timestamp: Date.now(),
-      target: this.extractTargetInfo(event.target as HTMLElement),
+      target: this.extractTargetInfo(target),
     });
     
     this.resetHesitationTimer();
@@ -217,6 +263,11 @@ export class PerceptionAgent {
 
   private handleHover(event: MouseEvent): void {
     const target = event.target as HTMLElement;
+    
+    // Ignore interactions with KAIROS UI elements to prevent infinite loops
+    if (this.shouldIgnoreElement(target)) {
+      return;
+    }
     
     if (isDataElement(target)) {
       this.recordInteraction({
@@ -230,6 +281,36 @@ export class PerceptionAgent {
         element: target.tagName 
       });
     }
+  }
+
+  /**
+   * Check if an element should be ignored (e.g., KAIROS UI elements)
+   * This prevents infinite loops where interacting with guidance UI triggers new guidance
+   */
+  private shouldIgnoreElement(element: HTMLElement | null): boolean {
+    if (!element) return false;
+    
+    // Check if element or any parent is the KAIROS UI container
+    let current: HTMLElement | null = element;
+    while (current) {
+      // Check for KAIROS UI container ID
+      if (current.id === 'kairos-spectra-ui') {
+        return true;
+      }
+      
+      // Check for KAIROS class prefixes
+      if (current.classList) {
+        for (const className of Array.from(current.classList)) {
+          if (className.startsWith('kairos-')) {
+            return true;
+          }
+        }
+      }
+      
+      current = current.parentElement;
+    }
+    
+    return false;
   }
 
   // ========================================================================

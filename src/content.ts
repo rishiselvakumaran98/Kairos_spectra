@@ -1,19 +1,24 @@
 /**
  * KAIROS-SPECTRA Content Script
  * 
- * This script runs in the context of web pages and coordinates
- * the PerceptionAgent and DataAgent.
+ * This script runs in the context of web pages and coordinates all agents.
  * 
- * Flow:
+ * Phase 1 Flow (Sensing):
  * 1. PerceptionAgent monitors user interactions
  * 2. When struggle detected → DataAgent extracts data
  * 3. If DOM extraction fails → VisionAgent uses GPT-4V screenshot analysis
- * 4. Results sent to background script for processing
+ * 
+ * Phase 2 Flow (Guiding):
+ * 4. OrchestratorAgent shows hierarchical guidance UI
+ * 5. User selects analytical goal and viz type
+ * 6. VisualizationAgent generates and renders chart
+ * 7. User refines visualization iteratively
  */
 
 import { perceptionAgent } from './agents/PerceptionAgent';
 import { dataAgent } from './agents/DataAgent';
 import { visionAgent } from './agents/VisionAgent';
+import { orchestratorAgent } from './agents/OrchestratorAgent';
 import type { StruggleEvent, ChromeMessage } from './types';
 import { logger, createMessage, sendMessageToBackground } from './utils';
 
@@ -51,6 +56,13 @@ class KairosSpectraContentScript {
       confidence: event.pattern.confidence,
     });
 
+    // CRITICAL: Check if guidance UI is already active
+    // Prevents context switching while user is interacting with KAIROS
+    if (orchestratorAgent.isGuidanceActive()) {
+      logger.info('ContentScript', 'Ignoring struggle - guidance already active');
+      return;
+    }
+
     try {
       // Extract data from involved elements using DOM scraping
       const extractionResult = await dataAgent.extractFromStruggleEvent(event);
@@ -81,8 +93,17 @@ class KairosSpectraContentScript {
         }
       }
 
-      // Log detailed extraction results to page console (for Phase 1 debugging)
-      this.logExtractionResults(event, extractionResult);
+      // Phase 2: Start hierarchical guidance if we have data
+      if (extractionResult.extractedData.length > 0) {
+        logger.info('ContentScript', 'Struggle detected, triggering Orchestrator guidance...');
+        
+        // Pause perception to prevent context switching
+        perceptionAgent.pause();
+        
+        await orchestratorAgent.startHierarchicalGuidance(extractionResult);
+      } else {
+        logger.warn('ContentScript', 'Struggle detected, but no data extracted. Aborting guidance.');
+      }
 
       // Send combined event to background script
       const message = createMessage(
@@ -98,7 +119,20 @@ class KairosSpectraContentScript {
 
       logger.info('ContentScript', 'Struggle event and data sent to background');
     } catch (error) {
-      logger.error('ContentScript', 'Failed to handle struggle event', error);
+      // Handle extension context invalidation gracefully
+      if (error instanceof Error && error.message.includes('Extension context invalidated')) {
+        logger.warn('ContentScript', 'Extension was reloaded. KAIROS-SPECTRA stopped until page refresh.');
+        
+        // Stop perception agent to prevent further errors
+        perceptionAgent.stop();
+        
+        // Optionally show a notification to the user
+        console.warn(
+          '⚠️ KAIROS-SPECTRA: Extension was reloaded. Please refresh this page to re-enable assistance.'
+        );
+      } else {
+        logger.error('ContentScript', 'Failed to handle struggle event', error);
+      }
     }
   }
 
@@ -165,7 +199,11 @@ class KairosSpectraContentScript {
     try {
       await sendMessageToBackground(message);
     } catch (error) {
-      logger.warn('ContentScript', 'Failed to notify background (extension may not be loaded)');
+      if (error instanceof Error && error.message.includes('Extension context invalidated')) {
+        logger.warn('ContentScript', 'Extension context invalidated - page refresh needed');
+      } else {
+        logger.warn('ContentScript', 'Failed to notify background (extension may not be loaded)');
+      }
     }
   }
 }
