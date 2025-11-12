@@ -888,3 +888,463 @@
   background: #e5e7eb;
   transform: translateY(-1px);
 }
+
+/* ============================================================================
+   Phase 3: Trust & Transparency Layer - Trust Indicator Styles
+   ============================================================================ */
+
+/* Confidence Badge */
+.kairos-trust-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  margin: 4px 0;
+}
+
+.kairos-trust-badge-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.kairos-trust-badge-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.kairos-trust-badge-score {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kairos-trust-badge-bar {
+  flex: 1;
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.kairos-trust-badge-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 3px;
+}
+
+.kairos-trust-badge-high .kairos-trust-badge-fill {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.kairos-trust-badge-medium .kairos-trust-badge-fill {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.kairos-trust-badge-low .kairos-trust-badge-fill {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+.kairos-trust-badge-percentage {
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 35px;
+  text-align: right;
+}
+
+.kairos-trust-badge-high .kairos-trust-badge-percentage {
+  color: #059669;
+}
+
+.kairos-trust-badge-medium .kairos-trust-badge-percentage {
+  color: #d97706;
+}
+
+.kairos-trust-badge-low .kairos-trust-badge-percentage {
+  color: #dc2626;
+}
+
+/* Mini confidence badge (inline) */
+.kairos-trust-badge-mini {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.kairos-trust-badge-mini.kairos-trust-badge-high {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.kairos-trust-badge-mini.kairos-trust-badge-medium {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.kairos-trust-badge-mini.kairos-trust-badge-low {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* Data Source Indicator */
+.kairos-trust-source {
+  padding: 12px;
+  background: #f0f9ff;
+  border-left: 3px solid #3b82f6;
+  border-radius: 6px;
+  margin: 12px 0;
+}
+
+.kairos-trust-source-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.kairos-trust-source-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.kairos-trust-source-text {
+  flex: 1;
+}
+
+.kairos-trust-source-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1e40af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.kairos-trust-source-desc {
+  font-size: 13px;
+  color: #1e3a8a;
+  font-weight: 500;
+}
+
+.kairos-trust-source-highlight-btn {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s;
+}
+
+.kairos-trust-source-highlight-btn:hover {
+  background: #2563eb;
+}
+
+/* Source element highlight (applied to actual DOM element) */
+.kairos-trust-source-highlight {
+  outline: 3px solid #3b82f6 !important;
+  outline-offset: 2px !important;
+  animation: pulse-highlight 1s ease-in-out 2;
+}
+
+@keyframes pulse-highlight {
+  0%, 100% { outline-color: #3b82f6; }
+  50% { outline-color: #60a5fa; }
+}
+
+/* Explanation Card */
+.kairos-trust-explanation-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 12px 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.kairos-trust-explanation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.kairos-trust-explanation-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.kairos-trust-explanation-icon {
+  font-size: 18px;
+}
+
+.kairos-trust-explanation-summary {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.kairos-trust-explanation-details {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.kairos-trust-explanation-details.expanded {
+  max-height: 1000px;
+}
+
+.kairos-trust-explanation-details-content {
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.kairos-trust-explanation-details-content p {
+  margin: 0 0 12px 0;
+}
+
+.kairos-trust-evidence {
+  background: #f9fafb;
+  padding: 12px;
+  border-radius: 6px;
+  margin-top: 12px;
+}
+
+.kairos-trust-evidence-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.kairos-trust-evidence-list {
+  margin: 0;
+  padding-left: 20px;
+  list-style: disc;
+}
+
+.kairos-trust-evidence-list li {
+  font-size: 12px;
+  color: #4b5563;
+  margin-bottom: 4px;
+}
+
+.kairos-trust-toggle-details {
+  width: 100%;
+  padding: 6px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #6b7280;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: all 0.2s;
+}
+
+.kairos-trust-toggle-details:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+/* Reasoning Sections */
+.kairos-trust-reasoning-section {
+  margin-top: 12px;
+}
+
+.kairos-trust-reasoning-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.kairos-trust-reasoning-list {
+  margin: 0;
+  padding-left: 20px;
+  list-style: disc;
+}
+
+.kairos-trust-reasoning-list li {
+  font-size: 13px;
+  color: #4b5563;
+  margin-bottom: 4px;
+  line-height: 1.5;
+}
+
+.kairos-trust-alternatives {
+  list-style: circle;
+}
+
+.kairos-trust-alternatives li {
+  color: #6b7280;
+  font-style: italic;
+}
+
+/* Chart Interpretation Panel */
+.kairos-trust-interpretation-panel {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid #fbbf24;
+  border-radius: 10px;
+  padding: 14px;
+  margin: 12px 0;
+}
+
+.kairos-trust-interpretation-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #92400e;
+  margin-bottom: 8px;
+}
+
+.kairos-trust-interpretation-icon {
+  font-size: 16px;
+}
+
+.kairos-trust-interpretation-summary {
+  font-size: 14px;
+  font-weight: 500;
+  color: #78350f;
+  margin-bottom: 10px;
+}
+
+.kairos-trust-insights {
+  background: white;
+  border-radius: 6px;
+  padding: 10px;
+  margin: 8px 0;
+}
+
+.kairos-trust-insights-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #92400e;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.kairos-trust-insights-list {
+  margin: 0;
+  padding-left: 18px;
+  list-style: none;
+}
+
+.kairos-trust-insights-list li {
+  font-size: 13px;
+  color: #1f2937;
+  margin-bottom: 4px;
+  position: relative;
+  padding-left: 4px;
+}
+
+.kairos-trust-insights-list li::before {
+  content: '→';
+  position: absolute;
+  left: -14px;
+  color: #f59e0b;
+  font-weight: bold;
+}
+
+.kairos-trust-interpretation-context {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  color: #78350f;
+  font-style: italic;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #fbbf24;
+}
+
+.kairos-trust-context-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* Reasoning Trail */
+.kairos-trust-reasoning-trail {
+  background: #f9fafb;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 12px 0;
+}
+
+.kairos-trust-trail-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.kairos-trust-trail-steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.kairos-trust-trail-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.kairos-trust-trail-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.kairos-trust-trail-text {
+  font-size: 12px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.kairos-trust-trail-confidence {
+  font-size: 10px;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.kairos-trust-trail-arrow {
+  font-size: 14px;
+  color: #9ca3af;
+  font-weight: bold;
+}
+
