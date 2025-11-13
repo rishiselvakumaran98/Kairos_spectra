@@ -888,3 +888,385 @@
   background: #e5e7eb;
   transform: translateY(-1px);
 }
+
+/* ============================================================================
+   Phase 2: GUM Integration Styles - Hesitation Popup & User Model
+   ============================================================================ */
+
+/* Hesitation-specific header */
+.hesitation-header {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+}
+
+.hesitation-header .kairos-title {
+  color: #ffffff;
+}
+
+/* Hesitation content layout */
+.kairos-hesitation-content {
+  padding: 24px;
+}
+
+.hesitation-intro {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+/* GUM Insights Cards */
+.kairos-gum-insights {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.gum-insight-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 2px solid #e5e7eb;
+  background: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.gum-insight-card:hover {
+  border-color: #4f46e5;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1);
+}
+
+.gum-insight-card .insight-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.gum-insight-card .insight-content {
+  flex: 1;
+}
+
+.gum-insight-card .insight-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #9ca3af;
+  margin-bottom: 4px;
+}
+
+.gum-insight-card .insight-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2937;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.gum-insight-card .insight-confidence {
+  display: flex;
+  align-items: center;
+}
+
+/* Category-specific colors */
+.identity-card {
+  border-color: #dbeafe;
+  background: #eff6ff;
+}
+
+.identity-card:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.activity-card {
+  border-color: #d1fae5;
+  background: #ecfdf5;
+}
+
+.activity-card:hover {
+  border-color: #10b981;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+}
+
+.goal-card {
+  border-color: #fce7f3;
+  background: #fdf2f8;
+}
+
+.goal-card:hover {
+  border-color: #ec4899;
+  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.15);
+}
+
+/* Confidence badges */
+.confidence-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.high-confidence {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.medium-confidence {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.low-confidence {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Suggested actions section */
+.kairos-suggested-actions {
+  margin-bottom: 16px;
+}
+
+.kairos-suggested-actions .action-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 12px;
+}
+
+.kairos-suggested-actions .primary-action {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.kairos-suggested-actions .primary-action:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3);
+}
+
+.kairos-suggested-actions .action-icon {
+  font-size: 20px;
+}
+
+/* Transparency actions */
+.kairos-transparency-actions {
+  display: flex;
+  justify-content: center;
+  padding-top: 12px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.kairos-link-btn {
+  background: none;
+  border: none;
+  color: #4f46e5;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: all 0.2s ease;
+}
+
+.kairos-link-btn:hover {
+  color: #4338ca;
+}
+
+/* Hesitation footer */
+.hesitation-footer {
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 11px;
+  text-align: center;
+}
+
+/* ============================================================================
+   User Model Modal Styles
+   ============================================================================ */
+
+.user-model-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.user-model-header .kairos-title,
+.user-model-header .kairos-icon {
+  color: #ffffff;
+}
+
+.kairos-user-model-content {
+  padding: 24px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.user-model-intro {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 24px;
+  text-align: center;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+/* Proposition Categories */
+.proposition-category {
+  margin-bottom: 24px;
+}
+
+.proposition-category .category-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.proposition-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Individual Proposition Cards */
+.proposition-card {
+  background: #ffffff;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.2s ease;
+}
+
+.proposition-card:hover {
+  border-color: #4f46e5;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1);
+}
+
+.proposition-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.proposition-age {
+  font-size: 11px;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.proposition-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2937;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+/* Grounding / Reasoning */
+.proposition-grounding {
+  margin-bottom: 12px;
+}
+
+.proposition-grounding details {
+  cursor: pointer;
+}
+
+.proposition-grounding summary {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  padding: 8px 12px;
+  background: #f9fafb;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.proposition-grounding summary:hover {
+  background: #f3f4f6;
+}
+
+.grounding-reasoning {
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.6;
+  padding: 12px;
+  margin-top: 8px;
+  background: #f9fafb;
+  border-left: 3px solid #4f46e5;
+  border-radius: 4px;
+}
+
+/* Proposition Actions */
+.proposition-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.proposition-edit-btn,
+.proposition-delete-btn {
+  padding: 6px 12px;
+  background: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.proposition-edit-btn:hover {
+  background: #e5e7eb;
+  color: #1f2937;
+}
+
+.proposition-delete-btn:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+/* Empty State */
+.user-model-empty {
+  text-align: center;
+  padding: 48px 24px;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.empty-text {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* User Model Footer */
+.user-model-footer {
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 11px;
+  text-align: center;
+}

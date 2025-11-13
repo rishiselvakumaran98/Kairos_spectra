@@ -914,6 +914,335 @@ export class HierarchicalGuidanceUI {
 
     this.show();
   }
+  
+  // ============================================================================
+  // Phase 2: GUM Integration - Hesitation Popup & User Model Display
+  // ============================================================================
+
+  /**
+   * Show hesitation popup with GUM propositions
+   * Triggered when user hesitates (stays in same position for long time)
+   * Implements G11 (transparency) and G12 (memory) from Amershi et al.
+   */
+  public async showHesitationPopup(
+    propositions: import('../types').Proposition[],
+    callbacks: {
+      onContinueWithGoal: (goal: import('../types').AnalyticalGoal) => void;
+      onViewFullModel: () => void;
+      onDismiss: () => void;
+    }
+  ): Promise<void> {
+    logger.info('HierarchicalGuidanceUI', 'Showing hesitation popup with GUM propositions');
+
+    this.createOrGetContainer();
+
+    // Group propositions by category for better organization
+    const grouped = this.groupPropositionsByCategory(propositions);
+
+    // Extract top insights for quick display
+    const topGoal = grouped.goal[0];
+    const topActivity = grouped.activity[0];
+    const topIdentity = grouped.identity[0];
+
+    const html = `
+      <div class="kairos-header hesitation-header">
+        <div class="kairos-icon">⏸️</div>
+        <div class="kairos-title">I noticed you paused...</div>
+        <button class="kairos-dismiss" id="kairos-dismiss">×</button>
+      </div>
+
+      <div class="kairos-hesitation-content">
+        <div class="hesitation-intro">
+          Based on what I've learned about you, here's what might help:
+        </div>
+
+        <div class="kairos-gum-insights">
+          ${topIdentity ? `
+            <div class="gum-insight-card identity-card">
+              <span class="insight-icon">👤</span>
+              <div class="insight-content">
+                <div class="insight-label">About You</div>
+                <div class="insight-text">${topIdentity.text}</div>
+                <div class="insight-confidence">
+                  ${this.renderConfidenceBadge(topIdentity.confidence * topIdentity.decayScore)}
+                </div>
+              </div>
+            </div>
+          ` : ''}
+
+          ${topActivity ? `
+            <div class="gum-insight-card activity-card">
+              <span class="insight-icon">🔍</span>
+              <div class="insight-content">
+                <div class="insight-label">Current Activity</div>
+                <div class="insight-text">${topActivity.text}</div>
+                <div class="insight-confidence">
+                  ${this.renderConfidenceBadge(topActivity.confidence * topActivity.decayScore)}
+                </div>
+              </div>
+            </div>
+          ` : ''}
+
+          ${topGoal ? `
+            <div class="gum-insight-card goal-card">
+              <span class="insight-icon">🎯</span>
+              <div class="insight-content">
+                <div class="insight-label">Your Goal</div>
+                <div class="insight-text">${topGoal.text}</div>
+                <div class="insight-confidence">
+                  ${this.renderConfidenceBadge(topGoal.confidence * topGoal.decayScore)}
+                </div>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+
+        ${topGoal ? `
+          <div class="kairos-suggested-actions">
+            <div class="action-label">💡 Would you like to:</div>
+            <button class="kairos-action-btn primary-action" data-goal="${this.mapGoalToAnalyticalGoal(topGoal.text)}">
+              <span class="action-icon">📊</span>
+              <span class="action-text">Explore this goal with visualizations</span>
+            </button>
+          </div>
+        ` : ''}
+
+        <div class="kairos-transparency-actions">
+          <button class="kairos-link-btn" id="kairos-view-full-model">
+            📖 View my complete user model
+          </button>
+        </div>
+      </div>
+
+      <div class="kairos-footer hesitation-footer">
+        <span class="kairos-help">Powered by GUM (General User Models)</span>
+      </div>
+    `;
+
+    this.container!.innerHTML = html;
+
+    // Attach listeners
+    document.getElementById('kairos-dismiss')?.addEventListener('click', callbacks.onDismiss);
+    document.getElementById('kairos-view-full-model')?.addEventListener('click', callbacks.onViewFullModel);
+
+    // Action button to continue with inferred goal
+    const actionBtn = this.container!.querySelector('.primary-action');
+    if (actionBtn) {
+      actionBtn.addEventListener('click', () => {
+        const goal = actionBtn.getAttribute('data-goal') as import('../types').AnalyticalGoal;
+        if (goal) {
+          callbacks.onContinueWithGoal(goal);
+        }
+      });
+    }
+
+    this.show();
+  }
+
+  /**
+   * Show full user model modal (transparency feature)
+   * Displays all GUM propositions grouped by category
+   * Implements Amershi G11 (transparency) and G17 (user control)
+   */
+  public async showUserModelModal(
+    propositions: import('../types').Proposition[],
+    callbacks: {
+      onEdit: (id: string, updates: Partial<import('../types').Proposition>) => void;
+      onDelete: (id: string) => void;
+      onDismiss: () => void;
+    }
+  ): Promise<void> {
+    logger.info('HierarchicalGuidanceUI', 'Showing full user model modal');
+
+    this.createOrGetContainer();
+
+    // Group propositions by category
+    const grouped = this.groupPropositionsByCategory(propositions);
+
+    const html = `
+      <div class="kairos-header user-model-header">
+        <div class="kairos-icon">🧠</div>
+        <div class="kairos-title">Your User Model</div>
+        <button class="kairos-dismiss" id="kairos-dismiss">×</button>
+      </div>
+
+      <div class="kairos-user-model-content">
+        <div class="user-model-intro">
+          This is what I've learned about you from your interactions. You can edit or delete any insight.
+        </div>
+
+        ${this.renderPropositionCategory('identity', '👤 Identity', grouped.identity)}
+        ${this.renderPropositionCategory('goal', '🎯 Goals', grouped.goal)}
+        ${this.renderPropositionCategory('activity', '🔍 Activities', grouped.activity)}
+        ${this.renderPropositionCategory('preference', '⭐ Preferences', grouped.preference)}
+        ${this.renderPropositionCategory('context', '📍 Context', grouped.context)}
+
+        ${propositions.length === 0 ? `
+          <div class="user-model-empty">
+            <div class="empty-icon">🤷</div>
+            <div class="empty-text">I'm still learning about you. Keep interacting!</div>
+          </div>
+        ` : ''}
+      </div>
+
+      <div class="kairos-footer user-model-footer">
+        <span class="kairos-help">I learn from your browsing patterns and interactions</span>
+      </div>
+    `;
+
+    this.container!.innerHTML = html;
+
+    // Attach listeners
+    document.getElementById('kairos-dismiss')?.addEventListener('click', callbacks.onDismiss);
+
+    // Edit buttons
+    this.container!.querySelectorAll('.proposition-edit-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const propId = btn.getAttribute('data-prop-id');
+        if (propId) {
+          const newText = prompt('Edit this insight:');
+          if (newText && newText.trim()) {
+            callbacks.onEdit(propId, { text: newText.trim() });
+          }
+        }
+      });
+    });
+
+    // Delete buttons
+    this.container!.querySelectorAll('.proposition-delete-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const propId = btn.getAttribute('data-prop-id');
+        if (propId && confirm('Delete this insight?')) {
+          callbacks.onDelete(propId);
+          // Remove from UI
+          btn.closest('.proposition-card')?.remove();
+        }
+      });
+    });
+
+    this.show();
+  }
+
+  // ============================================================================
+  // Helper Methods for GUM Display
+  // ============================================================================
+
+  /**
+   * Group propositions by category
+   */
+  private groupPropositionsByCategory(propositions: import('../types').Proposition[]) {
+    return {
+      identity: propositions.filter(p => p.category === 'identity'),
+      goal: propositions.filter(p => p.category === 'goal'),
+      activity: propositions.filter(p => p.category === 'activity'),
+      preference: propositions.filter(p => p.category === 'preference'),
+      context: propositions.filter(p => p.category === 'context'),
+    };
+  }
+
+  /**
+   * Render confidence badge with color coding
+   */
+  private renderConfidenceBadge(confidence: number): string {
+    const percentage = Math.round(confidence * 100);
+    const colorClass = 
+      percentage >= 80 ? 'high-confidence' :
+      percentage >= 50 ? 'medium-confidence' :
+      'low-confidence';
+
+    return `<span class="confidence-badge ${colorClass}">${percentage}% confident</span>`;
+  }
+
+  /**
+   * Render a category of propositions
+   */
+  private renderPropositionCategory(
+    categoryKey: string,
+    categoryTitle: string,
+    propositions: import('../types').Proposition[]
+  ): string {
+    if (propositions.length === 0) {
+      return '';
+    }
+
+    return `
+      <div class="proposition-category">
+        <h3 class="category-title">${categoryTitle}</h3>
+        <div class="proposition-list">
+          ${propositions.map(prop => this.renderProposition(prop)).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Render a single proposition card
+   */
+  private renderProposition(prop: import('../types').Proposition): string {
+    const effectiveConfidence = prop.confidence * prop.decayScore;
+    const age = Date.now() - prop.updatedAt;
+    const ageText = this.formatAge(age);
+
+    return `
+      <div class="proposition-card" data-prop-id="${prop.id}">
+        <div class="proposition-header">
+          <div class="proposition-confidence">
+            ${this.renderConfidenceBadge(effectiveConfidence)}
+          </div>
+          <div class="proposition-age">${ageText}</div>
+        </div>
+        <div class="proposition-text">${prop.text}</div>
+        <div class="proposition-grounding">
+          <details>
+            <summary>Why I believe this</summary>
+            <div class="grounding-reasoning">${prop.grounding.reasoning}</div>
+          </details>
+        </div>
+        <div class="proposition-actions">
+          <button class="proposition-edit-btn" data-prop-id="${prop.id}">✏️ Edit</button>
+          <button class="proposition-delete-btn" data-prop-id="${prop.id}">🗑️ Delete</button>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Format age of proposition
+   */
+  private formatAge(milliseconds: number): string {
+    const seconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    if (minutes > 0) return `${minutes}m ago`;
+    return 'just now';
+  }
+
+  /**
+   * Map GUM goal proposition text to analytical goal type
+   * Simple heuristic mapping - can be improved with NLP
+   */
+  private mapGoalToAnalyticalGoal(goalText: string): import('../types').AnalyticalGoal {
+    const text = goalText.toLowerCase();
+    
+    if (text.includes('trend') || text.includes('change') || text.includes('over time')) {
+      return 'compare_trends';
+    }
+    if (text.includes('distribution') || text.includes('spread') || text.includes('frequency')) {
+      return 'analyze_distribution';
+    }
+    if (text.includes('outlier') || text.includes('unusual') || text.includes('anomaly')) {
+      return 'find_outliers';
+    }
+    if (text.includes('correlation') || text.includes('relationship') || text.includes('association')) {
+      return 'correlation_analysis';
+    }
+    
+    return 'custom';
+  }
 }
 
 // Singleton instance

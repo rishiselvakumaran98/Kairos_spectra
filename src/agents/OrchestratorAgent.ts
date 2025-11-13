@@ -24,6 +24,9 @@ import type {
   InferredContext,
   RefinementRequest,
   ExtractedData,
+  Proposition,
+  QueryParams,
+  StruggleEvent,
 } from '../types';
 import { logger } from '../utils';
 import { hierarchicalGuidanceUI } from '../ui/HierarchicalGuidanceUI';
@@ -50,11 +53,15 @@ export class OrchestratorAgent {
    * Main entry point: Start the hierarchical guidance flow
    * Called by ContentScript when struggle is detected and data is extracted
    */
-  public async startHierarchicalGuidance(extractionResult: DataExtractionResult): Promise<void> {
+  public async startHierarchicalGuidance(
+    extractionResult: DataExtractionResult,
+    struggleEvent?: StruggleEvent
+  ): Promise<void> {
     try {
       logger.info('OrchestratorAgent', 'Starting hierarchical guidance flow', {
         extractedDataCount: extractionResult.extractedData.length,
         struggleEventId: extractionResult.struggleEventId,
+        struggleType: struggleEvent?.pattern?.type,
       });
 
       // Update state
@@ -62,29 +69,13 @@ export class OrchestratorAgent {
       this.state.currentLevel = 'TASK_PLANNING';
       this.state.isUIVisible = true;
 
-      // CRITICAL DECISION: Determine if user is analyzing EXISTING chart or wants NEW chart
-      const hasVisionChartData = extractionResult.extractedData.some(
-        (d) => d.type === 'chart' || (d.data as any).extractedVia === 'vision'
-      );
-      const hasTableData = extractionResult.extractedData.some((d) => d.type === 'table');
-
-      // If EXISTING chart/visualization detected → Skip to intelligent analysis mode
-      if (hasVisionChartData && !hasTableData) {
-        logger.info('OrchestratorAgent', 'EXISTING chart detected - showing intelligent analysis UI');
-        await this.showChartAnalysisMode(extractionResult);
-        return;
-      }
-
-      // Otherwise → Standard flow for NEW chart creation from table data
-      const context = this.inferContext(extractionResult);
-
-      // Show Level 1: Task Planning UI
-      await hierarchicalGuidanceUI.showTaskPlanningUI(extractionResult, context, {
-        onGoalSelected: (goal: AnalyticalGoal) => this.handleGoalSelection(goal),
-        onDismiss: () => this.dismissGuidance(),
+      // PHASE 2: ALWAYS show GUM user interaction popup for ALL struggles
+      // GUM provides context-aware insights for any type of struggle
+      logger.info('OrchestratorAgent', 'Struggle detected - showing GUM user model popup', {
+        struggleType: struggleEvent?.pattern?.type,
       });
-
-      logger.info('OrchestratorAgent', 'Task Planning UI shown', { context });
+      
+      await this.showHesitationPopupWithGUM(extractionResult);
 
     } catch (error) {
       logger.error('OrchestratorAgent', 'Failed to start guidance', error);
@@ -439,6 +430,233 @@ export class OrchestratorAgent {
     }
 
     return { message, dataElements, confidence };
+  }
+
+  // ============================================================================
+  // Phase 2: GUM Integration Methods
+  // ============================================================================
+
+  /**
+   * Query GUM for user propositions via background script
+   * Returns propositions from GeneralUserAgent
+   */
+  private async queryGUM(params?: QueryParams): Promise<Proposition[]> {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        {
+          type: 'GUM_QUERY',
+          payload: params || {},
+          timestamp: Date.now(),
+          source: 'orchestrator',
+        },
+        (response) => {
+          if (response && response.propositions) {
+            logger.info('OrchestratorAgent', 'GUM query successful', {
+              propositionCount: response.propositions.length,
+            });
+            resolve(response.propositions);
+          } else {
+            logger.warn('OrchestratorAgent', 'GUM query failed or empty');
+            resolve([]);
+          }
+        }
+      );
+    });
+  }
+
+  /**
+   * NEW: Show hesitation popup with GUM propositions
+   * Called when prolonged_hesitation is detected
+   */
+  private async showHesitationPopupWithGUM(extractionResult: DataExtractionResult): Promise<void> {
+    logger.info('OrchestratorAgent', 'Showing hesitation popup with GUM propositions');
+
+    try {
+      // FIRST: Trigger immediate GUM inference to ensure fresh propositions
+      logger.info('OrchestratorAgent', 'Triggering immediate GUM inference for struggle context');
+      
+      await new Promise<void>((resolve) => {
+        chrome.runtime.sendMessage(
+          {
+            type: 'GUM_TRIGGER_INFERENCE',
+            payload: {},
+            timestamp: Date.now(),
+            source: 'orchestrator',
+          },
+          (response) => {
+            if (response && response.success) {
+              logger.info('OrchestratorAgent', 'Immediate inference complete', {
+                propositionCount: response.count,
+              });
+            } else {
+              logger.warn('OrchestratorAgent', 'Immediate inference failed or incomplete');
+            }
+            resolve();
+          }
+        );
+      });
+
+      // THEN: Query GUM for current user model with high confidence propositions
+      const propositions = await this.queryGUM({
+        minConfidence: 0.3,
+        applyDecay: true,
+      });
+
+      if (propositions.length === 0) {
+        logger.warn('OrchestratorAgent', '⚠️ No GUM propositions available, showing default message');
+        
+        // Fallback to standard guidance if no GUM data yet
+        const context = this.inferContext(extractionResult);
+        await hierarchicalGuidanceUI.showTaskPlanningUI(extractionResult, context, {
+          onGoalSelected: (goal: AnalyticalGoal) => this.handleGoalSelection(goal),
+          onDismiss: () => this.dismissGuidance(),
+        });
+        return;
+      }
+
+      // Show hesitation popup with GUM propositions
+      await hierarchicalGuidanceUI.showHesitationPopup(propositions, {
+        onContinueWithGoal: (goal: AnalyticalGoal) => {
+          // User selected a goal from GUM-inferred options
+          this.handleGoalSelection(goal);
+        },
+        onViewFullModel: async () => {
+          // User wants to see full user model
+          await this.showFullUserModel();
+        },
+        onDismiss: () => this.dismissGuidance(),
+      });
+
+      logger.info('OrchestratorAgent', 'Hesitation popup shown with GUM propositions');
+
+    } catch (error) {
+      logger.error('OrchestratorAgent', 'Failed to show hesitation popup', error);
+      this.dismissGuidance();
+    }
+  }
+
+  /**
+   * Enhanced context inference using GUM propositions
+   * Combines tactical struggle data with strategic user model
+   */
+  private async inferContextWithGUM(extractionResult: DataExtractionResult): Promise<InferredContext> {
+    // Start with base context from data extraction
+    const baseContext = this.inferContext(extractionResult);
+
+    try {
+      // Query GUM for relevant propositions
+      const propositions = await this.queryGUM({
+        minConfidence: 0.4,
+        applyDecay: true,
+      });
+
+      if (propositions.length === 0) {
+        logger.info('OrchestratorAgent', 'No GUM propositions yet, using base context');
+        return baseContext;
+      }
+
+      // Extract goal propositions to enhance context
+      const goalProps = propositions.filter(p => p.category === 'goal');
+      const activityProps = propositions.filter(p => p.category === 'activity');
+      
+      // Enhance message with GUM insights
+      let enhancedMessage = baseContext.message;
+      
+      if (goalProps.length > 0) {
+        const topGoal = goalProps[0];
+        enhancedMessage = `Based on your recent activity, I think you're trying to ${topGoal.text.toLowerCase()}. ${baseContext.message}`;
+      } else if (activityProps.length > 0) {
+        const topActivity = activityProps[0];
+        enhancedMessage = `I noticed ${topActivity.text.toLowerCase()}. ${baseContext.message}`;
+      }
+
+      return {
+        ...baseContext,
+        message: enhancedMessage,
+        confidence: Math.max(baseContext.confidence, propositions[0].confidence * propositions[0].decayScore),
+      };
+
+    } catch (error) {
+      logger.error('OrchestratorAgent', 'Failed to enhance context with GUM', error);
+      return baseContext;
+    }
+  }
+
+  /**
+   * Show full user model modal (transparency feature)
+   */
+  private async showFullUserModel(): Promise<void> {
+    logger.info('OrchestratorAgent', 'Showing full user model');
+
+    try {
+      const propositions = await this.queryGUM();
+
+      await hierarchicalGuidanceUI.showUserModelModal(propositions, {
+        onEdit: async (id: string, updates: Partial<Proposition>) => {
+          await this.editProposition(id, updates);
+        },
+        onDelete: async (id: string) => {
+          await this.deleteProposition(id);
+        },
+        onDismiss: () => {
+          // Return to previous UI state
+          if (this.state.extractionResult) {
+            this.startHierarchicalGuidance(this.state.extractionResult);
+          }
+        },
+      });
+
+    } catch (error) {
+      logger.error('OrchestratorAgent', 'Failed to show user model', error);
+    }
+  }
+
+  /**
+   * Edit a GUM proposition (user control - Amershi G17)
+   */
+  private async editProposition(id: string, updates: Partial<Proposition>): Promise<void> {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        {
+          type: 'GUM_EDIT_PROPOSITION',
+          payload: { id, updates },
+          timestamp: Date.now(),
+          source: 'orchestrator',
+        },
+        (response) => {
+          if (response && response.success) {
+            logger.info('OrchestratorAgent', 'Proposition edited', { id });
+          } else {
+            logger.error('OrchestratorAgent', 'Failed to edit proposition', { id });
+          }
+          resolve();
+        }
+      );
+    });
+  }
+
+  /**
+   * Delete a GUM proposition (user control - Amershi G17)
+   */
+  private async deleteProposition(id: string): Promise<void> {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        {
+          type: 'GUM_DELETE_PROPOSITION',
+          payload: { id },
+          timestamp: Date.now(),
+          source: 'orchestrator',
+        },
+        (response) => {
+          if (response && response.success) {
+            logger.info('OrchestratorAgent', 'Proposition deleted', { id });
+          } else {
+            logger.error('OrchestratorAgent', 'Failed to delete proposition', { id });
+          }
+          resolve();
+        }
+      );
+    });
   }
 
   /**

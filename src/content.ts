@@ -24,6 +24,7 @@ import { logger, createMessage, sendMessageToBackground } from './utils';
 
 class KairosSpectraContentScript {
   private isInitialized: boolean = false;
+  private interactionFeedInterval: number | null = null;
 
   constructor() {
     this.initialize();
@@ -42,12 +43,39 @@ class KairosSpectraContentScript {
     // Set up message listener for commands from background/popup
     chrome.runtime.onMessage.addListener(this.handleMessage.bind(this));
 
+    // Periodically feed interactions to GUM for continuous learning (every 15 seconds)
+    this.startPeriodicInteractionFeed();
+
     this.isInitialized = true;
     
     logger.info('ContentScript', 'Initialization complete');
     
     // Notify background script that content script is ready
     await this.notifyReady();
+  }
+
+  /**
+   * Periodically send interaction history to GUM for continuous learning
+   */
+  private startPeriodicInteractionFeed(): void {
+    this.interactionFeedInterval = window.setInterval(() => {
+      const interactions = perceptionAgent.getRecentInteractions(50); // Last 50 interactions
+      
+      if (interactions.length > 0) {
+        const message = createMessage(
+          'AGENT_STATE_UPDATE',
+          {
+            interactionHistory: interactions,
+            url: window.location.href,
+          },
+          'content'
+        );
+
+        sendMessageToBackground(message).catch((error) => {
+          logger.debug('ContentScript', 'Failed to send periodic interactions (extension may be reloading)');
+        });
+      }
+    }, 15000); // Every 15 seconds
   }
 
   private async handleStruggleDetected(event: StruggleEvent): Promise<void> {
@@ -100,17 +128,19 @@ class KairosSpectraContentScript {
         // Pause perception to prevent context switching
         perceptionAgent.pause();
         
-        await orchestratorAgent.startHierarchicalGuidance(extractionResult);
+        // Pass struggle event to orchestrator for GUM hesitation detection
+        await orchestratorAgent.startHierarchicalGuidance(extractionResult, event);
       } else {
         logger.warn('ContentScript', 'Struggle detected, but no data extracted. Aborting guidance.');
       }
 
-      // Send combined event to background script
+      // Send combined event AND interaction history to background script for GUM
       const message = createMessage(
         'STRUGGLE_DETECTED',
         {
           struggleEvent: event,
           extractionResult,
+          interactionHistory: event.interactionHistory, // Send interactions to GUM
         },
         'content'
       );

@@ -131,6 +131,14 @@ export class PerceptionAgent {
     return { ...this.state };
   }
 
+  /**
+   * Get recent interactions for GUM learning
+   * @param limit Maximum number of recent interactions to return
+   */
+  public getRecentInteractions(limit: number = 50): UserInteractionEvent[] {
+    return this.state.interactionBuffer.slice(-limit);
+  }
+
   public updateConfig(config: Partial<PerceptionAgentState['config']>): void {
     this.state.config = { ...this.state.config, ...config };
     logger.debug('PerceptionAgent', 'Config updated', this.state.config);

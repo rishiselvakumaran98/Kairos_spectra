@@ -107,7 +107,13 @@ export type MessageType =
   | 'DATA_EXTRACTION_COMPLETE'
   | 'PERCEPTION_STATUS'
   | 'AGENT_STATE_UPDATE'
-  | 'CAPTURE_SCREENSHOT';
+  | 'CAPTURE_SCREENSHOT'
+  | 'GUM_QUERY'
+  | 'GUM_GET_PROPOSITIONS'
+  | 'GUM_DELETE_PROPOSITION'
+  | 'GUM_EDIT_PROPOSITION'
+  | 'GUM_ADD_PROPOSITION'
+  | 'GUM_TRIGGER_INFERENCE';
 
 export interface ChromeMessage<T = any> {
   type: MessageType;
@@ -218,4 +224,54 @@ export interface RefinementRequest {
   userPrompt: string;
   currentSpec: any;
   originalData: ExtractedData[];
+}
+
+// ============================================================================
+// Phase 2.5: GUM (General User Model) Types
+// Based on "Creating General User Models from Computer Use" (Shaikh et al., UIST 2025)
+// ============================================================================
+
+/**
+ * A confidence-weighted natural language proposition about the user
+ * Core abstraction of the GUM framework
+ */
+export interface Proposition {
+  id: string;
+  text: string; // Natural language statement (e.g., "User is a Ph.D. student")
+  confidence: number; // 0-1
+  createdAt: number;
+  updatedAt: number;
+  decayScore: number; // 0-1, how quickly this becomes stale (1.0 = stable, 0.1 = ephemeral)
+  grounding: {
+    observations: string[]; // IDs of observations that support this proposition
+    reasoning: string; // Generated explanation of why this proposition was inferred
+  };
+  category?: 'identity' | 'goal' | 'preference' | 'context' | 'activity'; // Optional semantic tag
+}
+
+/**
+ * Raw observation that feeds into GUM
+ */
+export interface Observation {
+  id: string;
+  source: 'interaction' | 'page_content' | 'screenshot' | 'custom';
+  timestamp: number;
+  data: any;
+  metadata?: {
+    pageURL?: string;
+    elementType?: string;
+    userAction?: string;
+  };
+}
+
+/**
+ * Query parameters for searching propositions
+ */
+export interface QueryParams {
+  searchTerms?: string;
+  relevanceDiversityBalance?: number;
+  timestampCutoff?: number;
+  applyDecay?: boolean;
+  category?: Proposition['category'];
+  minConfidence?: number;
 }
