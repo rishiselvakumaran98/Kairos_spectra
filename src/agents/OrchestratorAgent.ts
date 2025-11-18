@@ -514,8 +514,20 @@ export class OrchestratorAgent {
         return;
       }
 
-      // Show hesitation popup with GUM propositions
-      await hierarchicalGuidanceUI.showHesitationPopup(propositions, {
+      // Select ONLY the highest confidence proposition (per paper: focus on most confident insight)
+      const topProposition = propositions.reduce((prev, current) => 
+        (current.confidence * current.decayScore) > (prev.confidence * prev.decayScore) ? current : prev
+      );
+
+      logger.info('OrchestratorAgent', 'Selected top GUM proposition', {
+        text: topProposition.text,
+        confidence: topProposition.confidence,
+        decayScore: topProposition.decayScore,
+        effectiveConfidence: topProposition.confidence * topProposition.decayScore,
+      });
+
+      // Show hesitation popup with ONLY the top proposition
+      await hierarchicalGuidanceUI.showHesitationPopup([topProposition], {
         onContinueWithGoal: (goal: AnalyticalGoal) => {
           // User selected a goal from GUM-inferred options
           this.handleGoalSelection(goal);
@@ -527,7 +539,7 @@ export class OrchestratorAgent {
         onDismiss: () => this.dismissGuidance(),
       });
 
-      logger.info('OrchestratorAgent', 'Hesitation popup shown with GUM propositions');
+      logger.info('OrchestratorAgent', 'Hesitation popup shown with top GUM proposition');
 
     } catch (error) {
       logger.error('OrchestratorAgent', 'Failed to show hesitation popup', error);
@@ -598,6 +610,9 @@ export class OrchestratorAgent {
         onDelete: async (id: string) => {
           await this.deleteProposition(id);
         },
+        onResetAll: async () => {
+          await this.resetAllPropositions();
+        },
         onDismiss: () => {
           // Return to previous UI state
           if (this.state.extractionResult) {
@@ -652,6 +667,31 @@ export class OrchestratorAgent {
             logger.info('OrchestratorAgent', 'Proposition deleted', { id });
           } else {
             logger.error('OrchestratorAgent', 'Failed to delete proposition', { id });
+          }
+          resolve();
+        }
+      );
+    });
+  }
+
+  /**
+   * Reset all GUM propositions (user control - Amershi G8 & G17)
+   * Completely clears the user model, allowing fresh start
+   */
+  private async resetAllPropositions(): Promise<void> {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        {
+          type: 'GUM_RESET_ALL_PROPOSITIONS',
+          payload: {},
+          timestamp: Date.now(),
+          source: 'orchestrator',
+        },
+        (response) => {
+          if (response && response.success) {
+            logger.info('OrchestratorAgent', 'All propositions reset - user model cleared');
+          } else {
+            logger.error('OrchestratorAgent', 'Failed to reset propositions');
           }
           resolve();
         }

@@ -113,7 +113,14 @@ export type MessageType =
   | 'GUM_DELETE_PROPOSITION'
   | 'GUM_EDIT_PROPOSITION'
   | 'GUM_ADD_PROPOSITION'
-  | 'GUM_TRIGGER_INFERENCE';
+  | 'GUM_RESET_ALL_PROPOSITIONS' // Reset all user model propositions
+  | 'GUM_TRIGGER_INFERENCE'
+  | 'NEW_TOOL_GENERATED' // Phase 5: Notify content script about new widget
+  | 'GET_STORED_WIDGETS' // Phase 5: Request all stored widgets
+  | 'TOGGLE_PROACTIVE_GENERATION' // Phase 5: Enable/disable proactive generation
+  | 'DELETE_WIDGET' // Phase 5: Delete a generated widget
+  | 'RATE_WIDGET' // Phase 5: User feedback on widget
+  | 'OPEN_WIDGET'; // Phase 5: Open widget in UI
 
 export interface ChromeMessage<T = any> {
   type: MessageType;
@@ -274,4 +281,64 @@ export interface QueryParams {
   applyDecay?: boolean;
   category?: Proposition['category'];
   minConfidence?: number;
+}
+
+// ============================================================================
+// Phase 5: Proactive Tool Generation Types
+// ============================================================================
+
+/**
+ * An actionable objective derived from a GUM proposition
+ * Output of JIT_ObjectiveAgent
+ */
+export interface ActionableObjective {
+  objective: string; // Clear, specific description of user need
+  reasoning: string; // Why this objective was inferred from the proposition
+  toolType?: 'calculator' | 'tracker' | 'checker' | 'analyzer' | 'formatter' | 'monitor' | 'custom';
+  complexity?: 'simple' | 'moderate' | 'complex'; // Estimated implementation complexity
+  confidence: number; // 0-1, how confident we are this is the right objective
+  sourceProposition: {
+    id: string;
+    text: string;
+  };
+}
+
+/**
+ * Generated widget code (HTML, CSS, JS)
+ * Output of Generative_UIAgent
+ */
+export interface GeneratedWidget {
+  html: string; // HTML structure
+  css: string; // CSS styles
+  js: string; // JavaScript functionality
+  metadata: {
+    objective: string;
+    toolType: string;
+    generatedAt: number;
+    complexity: string;
+  };
+}
+
+/**
+ * Widget generation result with validation
+ */
+export interface WidgetGenerationResult {
+  success: boolean;
+  widget?: GeneratedWidget;
+  error?: string;
+  warnings?: string[];
+}
+
+/**
+ * Persistent widget storage
+ */
+export interface StoredWidget {
+  id: string;
+  widget: GeneratedWidget;
+  createdAt: number;
+  usageCount: number;
+  lastUsedAt: number;
+  userRating?: number; // 1-5 stars
+  isVisible: boolean;
+  isPinned: boolean;
 }

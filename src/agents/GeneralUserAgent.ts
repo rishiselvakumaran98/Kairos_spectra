@@ -297,6 +297,18 @@ export class GeneralUserAgent {
   }
 
   /**
+   * Clear all propositions (user control - reset user model)
+   * Implements G8 (efficient dismissal) and G17 (user control)
+   */
+  public async clearAllPropositions(): Promise<void> {
+    const count = this.state.propositions.length;
+    this.state.propositions = [];
+    await this.saveToStorage();
+    
+    logger.info('GeneralUserAgent', 'All propositions cleared - user model reset', { count });
+  }
+
+  /**
    * Edit a proposition (user control)
    */
   public async editProposition(id: string, updates: Partial<Pick<Proposition, 'text' | 'confidence' | 'category'>>): Promise<void> {
@@ -334,6 +346,75 @@ export class GeneralUserAgent {
     await this.saveToStorage();
 
     logger.info('GeneralUserAgent', 'Proposition manually added', { text, confidence });
+  }
+
+  /**
+   * PHASE 5: Get the single highest confidence proposition
+   * Used by JIT Objective Agent to determine user's current need
+   * 
+   * @returns The proposition with highest effective confidence (confidence × decayScore), or null if none exist
+   */
+  public async getHighestConfidenceProposition(): Promise<Proposition | null> {
+    if (this.state.propositions.length === 0) {
+      logger.debug('GeneralUserAgent', 'No propositions available');
+      return null;
+    }
+
+    // Calculate effective confidence (confidence × decayScore) for each proposition
+    const propositionsWithEffectiveConfidence = this.state.propositions.map(p => ({
+      proposition: p,
+      effectiveConfidence: p.confidence * p.decayScore,
+    }));
+
+    // Sort by effective confidence (descending)
+    propositionsWithEffectiveConfidence.sort((a, b) => 
+      b.effectiveConfidence - a.effectiveConfidence
+    );
+
+    const top = propositionsWithEffectiveConfidence[0];
+
+    logger.info('GeneralUserAgent', 'Retrieved highest confidence proposition', {
+      text: top.proposition.text,
+      confidence: top.proposition.confidence,
+      decayScore: top.proposition.decayScore,
+      effectiveConfidence: top.effectiveConfidence,
+      category: top.proposition.category,
+    });
+
+    return top.proposition;
+  }
+
+  /**
+   * PHASE 5: Call GUM model with interaction history
+   * Direct interface for background script to trigger inference
+   * 
+   * @param history - Array of user interaction events
+   * @returns Array of generated propositions
+   */
+  public async callGUMModel(history: UserInteractionEvent[]): Promise<Proposition[]> {
+    logger.info('GeneralUserAgent', 'callGUMModel invoked', {
+      historyLength: history.length,
+    });
+
+    if (!this.apiKey) {
+      logger.warn('GeneralUserAgent', 'No API key configured for GUM model');
+      return [];
+    }
+
+    try {
+      // Extract page content if available
+      const pageContent = this.extractPageContent();
+
+      // Run inference with provided history
+      await this.runInference(history, pageContent);
+
+      // Return all current propositions (freshly updated)
+      return this.getPropositions();
+
+    } catch (error) {
+      logger.error('GeneralUserAgent', 'callGUMModel failed', error);
+      return [];
+    }
   }
 
   // ========================================================================
@@ -510,71 +591,74 @@ export class GeneralUserAgent {
   }
 
   /**
-   * Build the GUM prompt inspired by Shaikh et al.'s approach
+   * Build the GUM prompt following Shaikh et al. (UIST 2025) format
+   * Reference: "Creating General User Models from Computer Use"
    */
   private buildGUMPrompt(
     interactions: UserInteractionEvent[],
     pageContent?: string
   ): string {
+    // Format existing propositions with all metadata
     const existingPropositions = this.state.propositions
-      .map(p => `- ${p.text} (confidence: ${p.confidence.toFixed(2)})`)
+      .map(p => `Proposition: ${p.text}\nConfidence: ${p.confidence.toFixed(1)}\nDecay: ${p.decayScore.toFixed(1)}\n`)
       .join('\n');
 
     const interactionSummary = this.summarizeInteractions(interactions);
 
     // Get page context safely (only available in content script)
-    let pageContextInfo = 'Page context not available (running in background worker)';
+    let observationContext = '';
     if (!this.isServiceWorker) {
       try {
-        const url = typeof window !== 'undefined' ? window.location.href : 'Unknown URL';
-        const title = typeof document !== 'undefined' ? document.title : 'Unknown Title';
-        pageContextInfo = `URL: ${url}\nTitle: ${title}`;
+        const url = typeof window !== 'undefined' ? window.location.href : '';
+        const title = typeof document !== 'undefined' ? document.title : '';
+        observationContext = `URL: ${url}\nPage Title: ${title}`;
         if (pageContent) {
-          pageContextInfo += `\nContent snippet: ${pageContent.substring(0, 500)}...`;
+          observationContext += `\n\nPage Content:\n${pageContent.substring(0, 800)}`;
         }
       } catch (error) {
         logger.warn('GeneralUserAgent', 'Failed to get page context', error);
       }
     }
 
-    return `You are a General User Model (GUM) that learns about a user by observing their computer interactions.
+    // GUM prompt format from the research paper (Section 5.3)
+    return `You are constructing a General User Model (GUM) by observing user interactions. GUMs take unstructured observations and construct confidence-weighted natural language propositions about a user's behavior, knowledge, beliefs, and preferences.
 
-**Current User Model:**
-${existingPropositions || 'No existing propositions yet.'}
+## Existing Propositions:
+${existingPropositions || 'No existing propositions yet.\n'}
 
-**Recent Interactions (last ${interactions.length} events):**
+## New Observation:
+${observationContext}
+
+User Interactions (last ${interactions.length} events):
 ${interactionSummary}
 
-**Current Page Context:**
-${pageContextInfo}
+## Task:
+Based on these observations, generate propositions about this user. Each proposition should capture insights about the user's:
+- Current activity or goal
+- Identity or role
+- Preferences or interests
+- Knowledge or expertise
+- Behavioral patterns
 
-**Task:**
-Based on the current user model and new observations, generate updated propositions about this user. Each proposition should:
-1. Be a natural language statement about the user's identity, goals, preferences, context, or current activity
-2. Include a confidence score (0.0 to 1.0)
-3. Include a decay score (0.0 to 1.0): how quickly this becomes stale (1.0 = stable like "User is a Ph.D. student", 0.3 = ephemeral like "User is debugging a memory leak")
-4. Include reasoning that explains why this proposition was inferred
-5. Be categorized as: identity, goal, preference, context, or activity
+For each proposition, provide:
+1. proposition: A clear natural language statement about the user
+2. confidence: Score from 0-10 (10 = certain, 5 = moderate, 1 = low confidence)
+3. decay: Rate of staleness from 1-10 (10 = stable like "User is a researcher", 2 = transient like "User is reading an email")
+4. reasoning: Explanation grounding the proposition in observations
+5. category: One of [activity, goal, identity, preference, knowledge]
 
-**Output Format (JSON array):**
+## Output Format (JSON array):
 [
   {
-    "text": "User is interested in data visualization",
-    "confidence": 0.85,
-    "decayScore": 0.9,
-    "reasoning": "User has spent significant time interacting with charts and tables on Wikipedia pages about data science topics",
-    "category": "preference"
-  },
-  {
-    "text": "User is comparing GDP data across countries",
-    "confidence": 0.75,
-    "decayScore": 0.4,
-    "reasoning": "Recent interactions show repeated clicks on table rows containing country names and GDP values",
+    "text": "User is exploring GDP data across different countries",
+    "confidence": 8,
+    "decayScore": 3,
+    "reasoning": "Screenshots show the user repeatedly interacting with tables comparing country GDP values, hovering over multiple rows",
     "category": "activity"
   }
 ]
 
-Generate 3-7 propositions that capture important insights about this user. Update existing propositions if you have new evidence, or add new ones if you discover new patterns.`;
+Generate 3-5 propositions. Prioritize actionable insights that reveal what the user is trying to accomplish right now.`;
   }
 
   /**
@@ -723,22 +807,27 @@ Generate 3-7 propositions that capture important insights about this user. Updat
       for (const item of parsed) {
         if (
           typeof item.text === 'string' &&
-          typeof item.confidence === 'number' &&
-          item.confidence >= this.state.config.minConfidenceThreshold
+          typeof item.confidence === 'number'
         ) {
-          propositions.push({
-            id: generateId(),
-            text: item.text,
-            confidence: Math.max(0, Math.min(1, item.confidence)),
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            decayScore: item.decayScore || 0.5,
-            grounding: {
-              observations: [], // Could link to specific observation IDs
-              reasoning: item.reasoning || 'Inferred from recent interactions',
-            },
-            category: item.category || 'context',
-          });
+          // Normalize confidence from 0-10 scale to 0-1 scale (paper uses 0-10)
+          const normalizedConfidence = Math.max(0, Math.min(1, item.confidence / 10));
+          
+          // Only keep propositions above minimum threshold
+          if (normalizedConfidence >= this.state.config.minConfidenceThreshold) {
+            propositions.push({
+              id: generateId(),
+              text: item.text,
+              confidence: normalizedConfidence,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+              decayScore: item.decayScore ? Math.max(0, Math.min(1, item.decayScore / 10)) : 0.5,
+              grounding: {
+                observations: [], // Could link to specific observation IDs
+                reasoning: item.reasoning || 'Inferred from recent interactions',
+              },
+              category: item.category || 'context',
+            });
+          }
         }
       }
 

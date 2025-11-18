@@ -936,8 +936,12 @@ export class HierarchicalGuidanceUI {
 
     this.createOrGetContainer();
 
+    // Filter to last 10 minutes and sort by confidence
+    const recentPropositions = this.filterPropositionsByTime(propositions, 10);
+    const sortedPropositions = this.sortPropositions(recentPropositions, 'confidence');
+
     // Group propositions by category for better organization
-    const grouped = this.groupPropositionsByCategory(propositions);
+    const grouped = this.groupPropositionsByCategory(sortedPropositions);
 
     // Extract top insights for quick display
     const topGoal = grouped.goal[0];
@@ -953,9 +957,15 @@ export class HierarchicalGuidanceUI {
 
       <div class="kairos-hesitation-content">
         <div class="hesitation-intro">
-          Based on what I've learned about you, here's what might help:
+          Based on what I've learned about you recently (last 10 minutes), here's what might help:
         </div>
 
+        ${sortedPropositions.length === 0 ? `
+          <div class="user-model-empty">
+            <div class="empty-icon">⏰</div>
+            <div class="empty-text">No recent activity in the last 10 minutes. View your complete history below.</div>
+          </div>
+        ` : `
         <div class="kairos-gum-insights">
           ${topIdentity ? `
             <div class="gum-insight-card identity-card">
@@ -1006,6 +1016,7 @@ export class HierarchicalGuidanceUI {
             </button>
           </div>
         ` : ''}
+        `}
 
         <div class="kairos-transparency-actions">
           <button class="kairos-link-btn" id="kairos-view-full-model">
@@ -1049,15 +1060,20 @@ export class HierarchicalGuidanceUI {
     callbacks: {
       onEdit: (id: string, updates: Partial<import('../types').Proposition>) => void;
       onDelete: (id: string) => void;
+      onResetAll?: () => void;
       onDismiss: () => void;
-    }
+    },
+    sortBy: 'confidence' | 'datetime' = 'confidence'
   ): Promise<void> {
     logger.info('HierarchicalGuidanceUI', 'Showing full user model modal');
 
     this.createOrGetContainer();
 
+    // Sort all propositions
+    const sortedPropositions = this.sortPropositions(propositions, sortBy);
+
     // Group propositions by category
-    const grouped = this.groupPropositionsByCategory(propositions);
+    const grouped = this.groupPropositionsByCategory(sortedPropositions);
 
     const html = `
       <div class="kairos-header user-model-header">
@@ -1069,6 +1085,22 @@ export class HierarchicalGuidanceUI {
       <div class="kairos-user-model-content">
         <div class="user-model-intro">
           This is what I've learned about you from your interactions. You can edit or delete any insight.
+        </div>
+
+        <div class="user-model-controls">
+          <div class="sort-control">
+            <label for="kairos-sort-select">Sort by:</label>
+            <select id="kairos-sort-select" class="kairos-sort-dropdown">
+              <option value="confidence" ${sortBy === 'confidence' ? 'selected' : ''}>Confidence Score</option>
+              <option value="datetime" ${sortBy === 'datetime' ? 'selected' : ''}>Most Recent</option>
+            </select>
+          </div>
+          ${propositions.length > 0 && callbacks.onResetAll ? `
+            <button class="kairos-reset-all-btn" id="kairos-reset-all">
+              <span class="reset-icon">🗑️</span>
+              <span class="reset-text">Reset All</span>
+            </button>
+          ` : ''}
         </div>
 
         ${this.renderPropositionCategory('identity', '👤 Identity', grouped.identity)}
@@ -1094,6 +1126,27 @@ export class HierarchicalGuidanceUI {
 
     // Attach listeners
     document.getElementById('kairos-dismiss')?.addEventListener('click', callbacks.onDismiss);
+
+    // Reset all button listener
+    const resetAllBtn = document.getElementById('kairos-reset-all');
+    if (resetAllBtn && callbacks.onResetAll) {
+      resetAllBtn.addEventListener('click', () => {
+        const confirmMessage = `⚠️ WARNING: This will permanently delete all ${propositions.length} learned insights about you.\n\nThis action cannot be undone.\n\nAre you sure you want to reset your entire user model?`;
+        if (confirm(confirmMessage) && callbacks.onResetAll) {
+          callbacks.onResetAll();
+          callbacks.onDismiss(); // Close the modal after reset
+        }
+      });
+    }
+
+    // Sort dropdown listener
+    const sortSelect = document.getElementById('kairos-sort-select') as HTMLSelectElement;
+    if (sortSelect) {
+      sortSelect.addEventListener('change', () => {
+        const newSortBy = sortSelect.value as 'confidence' | 'datetime';
+        this.showUserModelModal(propositions, callbacks, newSortBy);
+      });
+    }
 
     // Edit buttons
     this.container!.querySelectorAll('.proposition-edit-btn').forEach((btn) => {
@@ -1126,6 +1179,47 @@ export class HierarchicalGuidanceUI {
   // ============================================================================
   // Helper Methods for GUM Display
   // ============================================================================
+
+  /**
+   * Filter propositions by time (last N minutes)
+   */
+  private filterPropositionsByTime(
+    propositions: import('../types').Proposition[],
+    minutesAgo: number = 10
+  ): import('../types').Proposition[] {
+    const cutoffTime = Date.now() - (minutesAgo * 60 * 1000);
+    return propositions.filter(p => p.updatedAt >= cutoffTime);
+  }
+
+  /**
+   * Sort propositions by confidence or datetime
+   */
+  private sortPropositions(
+    propositions: import('../types').Proposition[],
+    sortBy: 'confidence' | 'datetime' = 'confidence'
+  ): import('../types').Proposition[] {
+    const sorted = [...propositions];
+    
+    if (sortBy === 'confidence') {
+      // Sort by effective confidence (confidence × decayScore), then by recency
+      sorted.sort((a, b) => {
+        const aEffective = a.confidence * a.decayScore;
+        const bEffective = b.confidence * b.decayScore;
+        
+        if (Math.abs(aEffective - bEffective) < 0.01) {
+          // If confidence is very close, prefer more recent
+          return b.updatedAt - a.updatedAt;
+        }
+        
+        return bEffective - aEffective;
+      });
+    } else {
+      // Sort by most recent first
+      sorted.sort((a, b) => b.updatedAt - a.updatedAt);
+    }
+    
+    return sorted;
+  }
 
   /**
    * Group propositions by category

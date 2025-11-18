@@ -18,6 +18,9 @@ class KairosSpectraPopup {
   private apiStatusEl: HTMLElement | null = null;
   private apiStatusText: HTMLElement | null = null;
   
+  // Phase 5: Proactive generation toggle
+  private proactiveGenerationToggle: HTMLInputElement | null = null;
+  
   private isLocked: boolean = true;
   private originalApiKey: string = '';
 
@@ -38,8 +41,14 @@ class KairosSpectraPopup {
     this.apiStatusEl = document.getElementById('apiStatus');
     this.apiStatusText = document.getElementById('apiStatusText');
     
+    // Phase 5 elements
+    this.proactiveGenerationToggle = document.getElementById('proactiveGenerationToggle') as HTMLInputElement;
+    
     // Load API key from storage
     await this.loadApiKey();
+    
+    // Load proactive generation setting
+    await this.loadProactiveGenerationSetting();
     
     // Set up event listeners
     this.setupEventListeners();
@@ -72,6 +81,11 @@ class KairosSpectraPopup {
       if (e.key === 'Enter' && !this.isLocked) {
         this.saveApiKey();
       }
+    });
+    
+    // Phase 5: Proactive generation toggle
+    this.proactiveGenerationToggle?.addEventListener('change', (e) => {
+      this.toggleProactiveGeneration((e.target as HTMLInputElement).checked);
     });
   }
   
@@ -283,6 +297,53 @@ class KairosSpectraPopup {
         <div class="status-label">Status</div>
         <div class="status-value">❌ ${message}</div>
       `;
+    }
+  }
+  
+  // ============================================================================
+  // Phase 5: Proactive Tool Generation
+  // ============================================================================
+  
+  /**
+   * Load proactive generation setting from storage
+   */
+  private async loadProactiveGenerationSetting(): Promise<void> {
+    try {
+      const result = await chrome.storage.sync.get(['proactive_generation_enabled']);
+      const isEnabled = result.proactive_generation_enabled ?? true; // Default: enabled
+      
+      if (this.proactiveGenerationToggle) {
+        this.proactiveGenerationToggle.checked = isEnabled;
+      }
+      
+      logger.info('Popup', 'Proactive generation setting loaded', { isEnabled });
+      
+    } catch (error) {
+      logger.error('Popup', 'Failed to load proactive generation setting', error);
+    }
+  }
+  
+  /**
+   * Toggle proactive generation on/off
+   */
+  private async toggleProactiveGeneration(enabled: boolean): Promise<void> {
+    try {
+      // Save to Chrome storage
+      await chrome.storage.sync.set({ proactive_generation_enabled: enabled });
+      
+      // Send message to background script
+      const message = createMessage('TOGGLE_PROACTIVE_GENERATION', { enabled }, 'background');
+      await chrome.runtime.sendMessage(message);
+      
+      logger.info('Popup', 'Proactive generation toggled', { enabled });
+      
+    } catch (error) {
+      logger.error('Popup', 'Failed to toggle proactive generation', error);
+      
+      // Revert toggle on error
+      if (this.proactiveGenerationToggle) {
+        this.proactiveGenerationToggle.checked = !enabled;
+      }
     }
   }
 }
