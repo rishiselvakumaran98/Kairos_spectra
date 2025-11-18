@@ -19,12 +19,15 @@ import { perceptionAgent } from './agents/PerceptionAgent';
 import { dataAgent } from './agents/DataAgent';
 import { visionAgent } from './agents/VisionAgent';
 import { orchestratorAgent } from './agents/OrchestratorAgent';
-import type { StruggleEvent, ChromeMessage } from './types';
+import { widgetPanel } from './ui/WidgetPanel';
+import type { StruggleEvent, ChromeMessage, StoredWidget } from './types';
 import { logger, createMessage, sendMessageToBackground } from './utils';
 
 class KairosSpectraContentScript {
   private isInitialized: boolean = false;
   private interactionFeedInterval: number | null = null;
+  private injectedWidgets: Map<string, HTMLElement> = new Map();
+  private keyboardShortcutHandler: ((e: KeyboardEvent) => void) | null = null;
 
   constructor() {
     this.initialize();
@@ -45,6 +48,9 @@ class KairosSpectraContentScript {
 
     // Periodically feed interactions to GUM for continuous learning (every 15 seconds)
     this.startPeriodicInteractionFeed();
+
+    // Set up keyboard shortcut for widget panel (Cmd/Ctrl + Shift + W)
+    this.setupKeyboardShortcut();
 
     this.isInitialized = true;
     
@@ -76,6 +82,283 @@ class KairosSpectraContentScript {
         });
       }
     }, 15000); // Every 15 seconds
+  }
+
+  /**
+   * Set up keyboard shortcut to toggle widget panel (Cmd/Ctrl + Shift + W)
+   */
+  private setupKeyboardShortcut(): void {
+    this.keyboardShortcutHandler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'W') {
+        e.preventDefault();
+        this.showWidgetPanel();
+      }
+    };
+    
+    document.addEventListener('keydown', this.keyboardShortcutHandler);
+    logger.info('ContentScript', 'Widget panel shortcut registered: Cmd/Ctrl + Shift + W');
+  }
+
+  /**
+   * Show the widget panel with all generated widgets
+   */
+  private async showWidgetPanel(): Promise<void> {
+    try {
+      // Get stored widgets from background
+      const response = await chrome.runtime.sendMessage(
+        createMessage('GET_STORED_WIDGETS', {}, 'content')
+      );
+
+      const widgets: StoredWidget[] = response.widgets || [];
+      
+      logger.info('ContentScript', 'Showing widget panel', { count: widgets.length });
+
+      widgetPanel.show(widgets, {
+        onInject: this.injectWidget.bind(this),
+        onPreview: this.previewWidget.bind(this),
+        onDelete: this.deleteWidget.bind(this),
+        onRate: this.rateWidget.bind(this),
+        onDismiss: () => widgetPanel.hide(),
+      });
+    } catch (error) {
+      logger.error('ContentScript', 'Failed to load widgets', error);
+    }
+  }
+
+  /**
+   * Inject a widget into the page
+   */
+  private async injectWidget(widgetId: string): Promise<void> {
+    try {
+      logger.info('ContentScript', 'Injecting widget', { widgetId });
+
+      // Get widget from background
+      const response = await chrome.runtime.sendMessage(
+        createMessage('GET_STORED_WIDGETS', {}, 'content')
+      );
+
+      const widget = response.widgets?.find((w: StoredWidget) => w.id === widgetId);
+      
+      if (!widget) {
+        logger.error('ContentScript', 'Widget not found', { widgetId });
+        return;
+      }
+
+      // Create isolated container for widget
+      const container = document.createElement('div');
+      container.id = `kairos-widget-${widgetId}`;
+      container.className = 'kairos-injected-widget';
+      container.setAttribute('data-widget-id', widgetId);
+
+      // Add widget HTML
+      container.innerHTML = `
+        <div class="widget-container">
+          <div class="widget-header">
+            <div class="widget-title">${widget.widget.metadata.objective}</div>
+            <button class="widget-close" data-widget-id="${widgetId}">×</button>
+          </div>
+          <div class="widget-body">
+            ${widget.widget.html}
+          </div>
+        </div>
+      `;
+
+      // Add widget CSS
+      if (widget.widget.css) {
+        const style = document.createElement('style');
+        style.textContent = widget.widget.css;
+        container.appendChild(style);
+      }
+
+      // Append to body
+      document.body.appendChild(container);
+
+      // Execute widget JavaScript (in isolated scope)
+      if (widget.widget.js) {
+        try {
+          const widgetScope = {
+            container,
+            widgetId,
+            logger,
+          };
+          
+          const widgetFunction = new Function('scope', widget.widget.js);
+          widgetFunction(widgetScope);
+        } catch (error) {
+          logger.error('ContentScript', 'Widget JS execution failed', error);
+        }
+      }
+
+      // Track injected widget
+      this.injectedWidgets.set(widgetId, container);
+
+      // Set up close button
+      const closeBtn = container.querySelector('.widget-close');
+      closeBtn?.addEventListener('click', () => {
+        this.removeInjectedWidget(widgetId);
+      });
+
+      // Notify background to update usage count
+      await chrome.runtime.sendMessage(
+        createMessage('OPEN_WIDGET', { widgetId }, 'content')
+      );
+
+      // Hide widget panel
+      widgetPanel.hide();
+
+      logger.info('ContentScript', 'Widget injected successfully', { widgetId });
+    } catch (error) {
+      logger.error('ContentScript', 'Widget injection failed', error);
+    }
+  }
+
+  /**
+   * Remove an injected widget from the page
+   */
+  private removeInjectedWidget(widgetId: string): void {
+    const container = this.injectedWidgets.get(widgetId);
+    if (container) {
+      container.remove();
+      this.injectedWidgets.delete(widgetId);
+      logger.info('ContentScript', 'Widget removed', { widgetId });
+    }
+  }
+
+  /**
+   * Preview a widget before injection
+   */
+  private async previewWidget(widgetId: string): Promise<void> {
+    try {
+      logger.info('ContentScript', 'Previewing widget', { widgetId });
+
+      // Get widget from background
+      const response = await chrome.runtime.sendMessage(
+        createMessage('GET_STORED_WIDGETS', {}, 'content')
+      );
+
+      const widget = response.widgets?.find((w: StoredWidget) => w.id === widgetId);
+      
+      if (!widget) {
+        logger.error('ContentScript', 'Widget not found', { widgetId });
+        return;
+      }
+
+      // Create preview modal
+      const modal = document.createElement('div');
+      modal.id = 'kairos-widget-preview';
+      modal.className = 'kairos-widget-preview';
+      
+      modal.innerHTML = `
+        <div class="preview-overlay"></div>
+        <div class="preview-content">
+          <div class="preview-header">
+            <div class="preview-title">Widget Preview</div>
+            <button class="preview-close">×</button>
+          </div>
+          <div class="preview-body">
+            <iframe class="preview-iframe" sandbox="allow-scripts"></iframe>
+          </div>
+          <div class="preview-footer">
+            <button class="preview-cancel">Cancel</button>
+            <button class="preview-inject">Use This Tool</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      // Inject widget into iframe after it loads
+      const iframe = modal.querySelector('.preview-iframe') as HTMLIFrameElement;
+      
+      iframe.onload = () => {
+        try {
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+          if (iframeDoc) {
+            iframeDoc.open();
+            iframeDoc.write(`
+              <!DOCTYPE html>
+              <html>
+                <head>
+                  <meta charset="UTF-8">
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                  <style>
+                    body { margin: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+                    ${widget.widget.css || ''}
+                  </style>
+                </head>
+                <body>
+                  ${widget.widget.html || '<p>No content</p>'}
+                  <script>
+                    try {
+                      ${widget.widget.js || ''}
+                    } catch (e) {
+                      console.error('Widget error:', e);
+                      document.body.innerHTML += '<p style="color: red;">Error loading widget</p>';
+                    }
+                  </script>
+                </body>
+              </html>
+            `);
+            iframeDoc.close();
+            logger.info('ContentScript', 'Widget injected into preview iframe', { widgetId });
+          }
+        } catch (error) {
+          logger.error('ContentScript', 'Failed to inject widget into iframe', error);
+        }
+      };
+      
+      // Trigger iframe load
+      iframe.src = 'about:blank';
+
+      // Set up event listeners
+      modal.querySelector('.preview-close')?.addEventListener('click', () => modal.remove());
+      modal.querySelector('.preview-cancel')?.addEventListener('click', () => modal.remove());
+      modal.querySelector('.preview-inject')?.addEventListener('click', async () => {
+        modal.remove();
+        await this.injectWidget(widgetId);
+      });
+
+      logger.info('ContentScript', 'Widget preview shown', { widgetId });
+    } catch (error) {
+      logger.error('ContentScript', 'Widget preview failed', error);
+    }
+  }
+
+  /**
+   * Delete a widget
+   */
+  private async deleteWidget(widgetId: string): Promise<void> {
+    try {
+      logger.info('ContentScript', 'Deleting widget', { widgetId });
+
+      await chrome.runtime.sendMessage(
+        createMessage('DELETE_WIDGET', { widgetId }, 'content')
+      );
+
+      // Remove from page if injected
+      this.removeInjectedWidget(widgetId);
+
+      logger.info('ContentScript', 'Widget deleted', { widgetId });
+    } catch (error) {
+      logger.error('ContentScript', 'Widget deletion failed', error);
+    }
+  }
+
+  /**
+   * Rate a widget
+   */
+  private async rateWidget(widgetId: string, rating: number): Promise<void> {
+    try {
+      logger.info('ContentScript', 'Rating widget', { widgetId, rating });
+
+      await chrome.runtime.sendMessage(
+        createMessage('RATE_WIDGET', { widgetId, rating }, 'content')
+      );
+
+      logger.info('ContentScript', 'Widget rated', { widgetId, rating });
+    } catch (error) {
+      logger.error('ContentScript', 'Widget rating failed', error);
+    }
   }
 
   private async handleStruggleDetected(event: StruggleEvent): Promise<void> {
@@ -208,12 +491,129 @@ class KairosSpectraContentScript {
         sendResponse({ success: true });
         break;
 
+      case 'NEW_TOOL_GENERATED':
+        // Show notification that a new widget was generated
+        logger.info('ContentScript', 'New tool generated', message.payload);
+        this.showNewWidgetNotification(message.payload.widgetId);
+        sendResponse({ success: true });
+        break;
+
+      case 'OPEN_WIDGET_PANEL':
+        // Open widget panel from popup
+        this.showWidgetPanel();
+        sendResponse({ success: true });
+        break;
+
       default:
         logger.warn('ContentScript', 'Unknown message type', message.type);
         sendResponse({ error: 'Unknown message type' });
     }
 
     return true; // Keep channel open for async response
+  }
+
+  /**
+   * Show a notification when a new widget is generated
+   */
+  private async showNewWidgetNotification(widgetId: string): Promise<void> {
+    // Get widget details
+    const response = await chrome.runtime.sendMessage(
+      createMessage('GET_STORED_WIDGETS', {}, 'content')
+    );
+    const widget = response.widgets?.find((w: StoredWidget) => w.id === widgetId);
+    
+    if (!widget) {
+      logger.error('ContentScript', 'Widget not found for notification', { widgetId });
+      return;
+    }
+
+    // Show proactive glyph cursor notification
+    this.showProactiveGlyph(widget);
+  }
+
+  /**
+   * Show proactive glyph cursor with widget suggestion
+   */
+  private showProactiveGlyph(widget: StoredWidget): void {
+    const glyph = document.createElement('div');
+    glyph.className = 'kairos-proactive-glyph';
+    glyph.innerHTML = `
+      <div class="glyph-container">
+        <div class="glyph-pulse"></div>
+        <div class="glyph-icon">✨</div>
+        <div class="glyph-content">
+          <div class="glyph-header">
+            <div class="glyph-title">I noticed you're exploring data</div>
+            <button class="glyph-dismiss">×</button>
+          </div>
+          <div class="glyph-message">
+            ${widget.widget.metadata.objective}
+          </div>
+          <div class="glyph-actions">
+            <button class="glyph-btn preview" data-action="preview">
+              <span class="btn-icon">👁️</span>
+              <span class="btn-text">Preview</span>
+            </button>
+            <button class="glyph-btn primary" data-action="generate">
+              <span class="btn-icon">⚡</span>
+              <span class="btn-text">Generate Tool</span>
+            </button>
+            <button class="glyph-btn" data-action="later">
+              <span class="btn-text">Maybe Later</span>
+            </button>
+          </div>
+          <div class="glyph-footer">
+            Powered by your browsing patterns
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(glyph);
+
+    // Position near cursor (bottom-right)
+    setTimeout(() => {
+      glyph.style.opacity = '1';
+      glyph.style.transform = 'translateY(0)';
+    }, 100);
+
+    // Handle actions
+    const handleAction = async (action: string) => {
+      if (action === 'preview') {
+        glyph.remove();
+        await this.previewWidget(widget.id);
+      } else if (action === 'generate') {
+        glyph.remove();
+        await this.injectWidget(widget.id);
+      } else if (action === 'later') {
+        glyph.classList.add('fade-out');
+        setTimeout(() => glyph.remove(), 300);
+      }
+    };
+
+    // Action buttons
+    glyph.querySelectorAll('.glyph-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const action = btn.getAttribute('data-action');
+        if (action) handleAction(action);
+      });
+    });
+
+    // Dismiss button
+    glyph.querySelector('.glyph-dismiss')?.addEventListener('click', () => {
+      glyph.classList.add('fade-out');
+      setTimeout(() => glyph.remove(), 300);
+    });
+
+    // Auto-dismiss after 15 seconds
+    setTimeout(() => {
+      if (glyph.parentElement) {
+        glyph.classList.add('fade-out');
+        setTimeout(() => glyph.remove(), 300);
+      }
+    }, 15000);
+
+    logger.info('ContentScript', 'Proactive glyph shown', { widgetId: widget.id });
   }
 
   private async notifyReady(): Promise<void> {

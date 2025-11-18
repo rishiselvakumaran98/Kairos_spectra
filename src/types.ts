@@ -120,7 +120,9 @@ export type MessageType =
   | 'TOGGLE_PROACTIVE_GENERATION' // Phase 5: Enable/disable proactive generation
   | 'DELETE_WIDGET' // Phase 5: Delete a generated widget
   | 'RATE_WIDGET' // Phase 5: User feedback on widget
-  | 'OPEN_WIDGET'; // Phase 5: Open widget in UI
+  | 'OPEN_WIDGET' // Phase 5: Open widget in UI
+  | 'TRIGGER_MANUAL_GENERATION' // Phase 5: Manually trigger generation for testing
+  | 'OPEN_WIDGET_PANEL'; // Phase 5: Open widget panel from popup
 
 export interface ChromeMessage<T = any> {
   type: MessageType;

@@ -160,15 +160,19 @@ class KairosSpectraBackground {
         break;
 
       case 'DELETE_WIDGET':
-        this.handleDeleteWidget(message.payload.id, sendResponse);
+        this.handleDeleteWidget(message.payload.widgetId, sendResponse);
         return true;
 
       case 'RATE_WIDGET':
-        this.handleRateWidget(message.payload.id, message.payload.rating, sendResponse);
+        this.handleRateWidget(message.payload.widgetId, message.payload.rating, sendResponse);
         return true;
 
       case 'OPEN_WIDGET':
-        this.handleOpenWidget(message.payload.id, sendResponse);
+        this.handleOpenWidget(message.payload.widgetId, sendResponse);
+        return true;
+
+      case 'TRIGGER_MANUAL_GENERATION':
+        this.handleManualGeneration(sendResponse);
         return true;
 
       default:
@@ -748,6 +752,23 @@ class KairosSpectraBackground {
     } catch (error) {
       logger.error('Background', 'Failed to open widget', error);
       sendResponse({ error: 'Open failed' });
+    }
+  }
+
+  /**
+   * Manually trigger widget generation (for testing)
+   */
+  private async handleManualGeneration(sendResponse: (response: any) => void): Promise<void> {
+    try {
+      logger.info('Background', '🧪 Manual generation triggered');
+
+      // Run generation cycle immediately
+      await this.runProactiveGenerationCycle();
+
+      sendResponse({ success: true });
+    } catch (error) {
+      logger.error('Background', 'Manual generation failed', error);
+      sendResponse({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 }

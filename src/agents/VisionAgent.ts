@@ -27,6 +27,12 @@ interface VisionAnalysisResult {
 export class VisionAgent {
   private apiKey: string | null = null;
   private apiEndpoint = 'https://api.openai.com/v1/chat/completions';
+  
+  // Rate limiting & caching
+  private lastAnalysisTime: number = 0;
+  private readonly MIN_ANALYSIS_INTERVAL_MS = 10000; // 10 seconds between calls
+  private analysisCache = new Map<string, { result: VisionAnalysisResult; timestamp: number }>();
+  private readonly CACHE_TTL_MS = 30000; // 30 seconds cache lifetime
 
   constructor() {
     this.loadApiKey();
@@ -40,7 +46,27 @@ export class VisionAgent {
     elementSelector?: string
   ): Promise<ExtractedData | null> {
     try {
+      // Rate limiting: Prevent too many API calls
+      const now = Date.now();
+      const timeSinceLastAnalysis = now - this.lastAnalysisTime;
+      if (timeSinceLastAnalysis < this.MIN_ANALYSIS_INTERVAL_MS) {
+        logger.warn('VisionAgent', 'Rate limited - too soon since last analysis', {
+          timeSinceLastMs: timeSinceLastAnalysis,
+          minIntervalMs: this.MIN_ANALYSIS_INTERVAL_MS,
+        });
+        return null;
+      }
+
+      // Check cache for recent analysis of same area
+      const cacheKey = `${Math.round(mousePosition.x / 100)}_${Math.round(mousePosition.y / 100)}`;
+      const cached = this.analysisCache.get(cacheKey);
+      if (cached && (now - cached.timestamp) < this.CACHE_TTL_MS) {
+        logger.info('VisionAgent', 'Using cached analysis', { cacheKey });
+        return this.convertToExtractedData(cached.result, mousePosition, elementSelector);
+      }
+
       logger.info('VisionAgent', 'Starting vision analysis', { mousePosition });
+      this.lastAnalysisTime = now;
 
       // Step 1: Capture screenshot with mouse cursor marked
       const screenshot = await this.captureScreenshotWithCursor(mousePosition);
@@ -58,35 +84,65 @@ export class VisionAgent {
         return null;
       }
 
+      // Cache the result
+      this.analysisCache.set(cacheKey, { result: analysis, timestamp: now });
+      
+      // Clean old cache entries
+      this.cleanCache();
+
       // Step 3: Convert to ExtractedData format
-      const extractedData: ExtractedData = {
-        type: this.mapElementTypeToDataType(analysis.elementType),
-        sourceElement: elementSelector || `vision-based@${mousePosition.x},${mousePosition.y}`,
-        confidence: analysis.confidence,
-        data: {
-          elementType: analysis.elementType,
-          description: analysis.description,
-          chartType: analysis.chartType,
-          dataDescription: analysis.dataDescription,
-          possibleActions: analysis.possibleActions,
-          extractedVia: 'vision',
-          screenshot, // CRITICAL: Store screenshot for later use
-          mousePosition,
-          url: window.location.href,
-          timestamp: Date.now(),
-        },
-      };
-
-      logger.info('VisionAgent', 'Vision analysis complete', {
-        type: extractedData.type,
-        confidence: extractedData.confidence,
-      });
-
-      return extractedData;
+      return this.convertToExtractedData(analysis, mousePosition, elementSelector, screenshot);
 
     } catch (error) {
       logger.error('VisionAgent', 'Vision analysis failed', error);
       return null;
+    }
+  }
+
+  /**
+   * Convert VisionAnalysisResult to ExtractedData format
+   */
+  private convertToExtractedData(
+    analysis: VisionAnalysisResult,
+    mousePosition: Point,
+    elementSelector?: string,
+    screenshot?: string
+  ): ExtractedData {
+    const extractedData: ExtractedData = {
+      type: this.mapElementTypeToDataType(analysis.elementType),
+      sourceElement: elementSelector || `vision-based@${mousePosition.x},${mousePosition.y}`,
+      confidence: analysis.confidence,
+      data: {
+        elementType: analysis.elementType,
+        description: analysis.description,
+        chartType: analysis.chartType,
+        dataDescription: analysis.dataDescription,
+        possibleActions: analysis.possibleActions,
+        extractedVia: 'vision',
+        screenshot, // CRITICAL: Store screenshot for later use
+        mousePosition,
+        url: window.location.href,
+        timestamp: Date.now(),
+      },
+    };
+
+    logger.info('VisionAgent', 'Vision analysis complete', {
+      type: extractedData.type,
+      confidence: extractedData.confidence,
+    });
+
+    return extractedData;
+  }
+
+  /**
+   * Clean expired cache entries
+   */
+  private cleanCache(): void {
+    const now = Date.now();
+    for (const [key, value] of this.analysisCache.entries()) {
+      if (now - value.timestamp > this.CACHE_TTL_MS) {
+        this.analysisCache.delete(key);
+      }
     }
   }
 
@@ -173,7 +229,25 @@ export class VisionAgent {
         ctx.lineTo(scaledX, scaledY + 30);
         ctx.stroke();
 
-        resolve(canvas.toDataURL('image/png'));
+        // Compress image to reduce API costs (max 800px width, JPEG 70%)
+        const MAX_WIDTH = 800;
+        let finalCanvas = canvas;
+        
+        if (canvas.width > MAX_WIDTH) {
+          const scale = MAX_WIDTH / canvas.width;
+          const compressedCanvas = document.createElement('canvas');
+          compressedCanvas.width = MAX_WIDTH;
+          compressedCanvas.height = canvas.height * scale;
+          
+          const compressedCtx = compressedCanvas.getContext('2d');
+          if (compressedCtx) {
+            compressedCtx.drawImage(canvas, 0, 0, compressedCanvas.width, compressedCanvas.height);
+            finalCanvas = compressedCanvas;
+          }
+        }
+        
+        // Use JPEG with 0.7 quality for smaller file size (was PNG)
+        resolve(finalCanvas.toDataURL('image/jpeg', 0.7));
       };
       img.onerror = reject;
       img.src = screenshotDataUrl;
@@ -193,27 +267,16 @@ export class VisionAgent {
       return null;
     }
 
-    const prompt = `You are analyzing a screenshot from a data analysis/visualization tool to help a user who appears to be struggling.
+        const prompt = `Analyze screenshot at RED CIRCLE (${mousePosition.x}, ${mousePosition.y}).
 
-The user's mouse cursor is marked with a RED CIRCLE at position (${mousePosition.x}, ${mousePosition.y}).
-
-${elementSelector ? `DOM selector (if available): ${elementSelector}` : 'No DOM information available (likely Canvas/SVG rendering).'}
-
-Please analyze:
-1. What type of visual element is at the cursor location? (table, chart, graph, form, canvas, etc.)
-2. If it's a chart/graph, what type? (scatter plot, line chart, bar chart, pie chart, etc.)
-3. What data or information is being displayed?
-4. What analytical task might the user be trying to accomplish?
-5. What actions are available at this location? (e.g., filter, zoom, export, change view)
-
-Respond in JSON format:
+Return JSON:
 {
-  "elementType": "table" | "chart" | "graph" | "canvas" | "form" | "unknown",
-  "description": "Brief description of what's at the cursor",
-  "chartType": "specific chart type if applicable",
-  "dataDescription": "What data/information is shown",
-  "possibleActions": ["action1", "action2", ...],
-  "confidence": 0.0-1.0
+  "elementType": "table"|"chart"|"graph"|"canvas"|"form"|"unknown",
+  "description": "brief description",
+  "chartType": "type if chart",
+  "dataDescription": "data shown",
+  "possibleActions": ["actions"],
+  "confidence": 0-1
 }`;
 
     try {
@@ -237,13 +300,13 @@ Respond in JSON format:
                   type: 'image_url',
                   image_url: {
                     url: screenshotDataUrl,
-                    detail: 'high', // High detail for better analysis
+                    detail: 'low', // Low detail to reduce tokens (was 'high')
                   },
                 },
               ],
             },
           ],
-          max_tokens: 500,
+          max_tokens: 300, // Reduced from 500
           temperature: 0.3, // Low temperature for more consistent analysis
         }),
       });

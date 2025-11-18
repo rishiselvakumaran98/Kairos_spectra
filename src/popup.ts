@@ -87,6 +87,15 @@ class KairosSpectraPopup {
     this.proactiveGenerationToggle?.addEventListener('change', (e) => {
       this.toggleProactiveGeneration((e.target as HTMLInputElement).checked);
     });
+    
+    // Phase 5: Manual test triggers
+    document.getElementById('triggerProactiveGeneration')?.addEventListener('click', () => {
+      this.triggerManualGeneration();
+    });
+    
+    document.getElementById('openWidgetPanel')?.addEventListener('click', () => {
+      this.openWidgetPanel();
+    });
   }
   
   private async loadApiKey(): Promise<void> {
@@ -344,6 +353,55 @@ class KairosSpectraPopup {
       if (this.proactiveGenerationToggle) {
         this.proactiveGenerationToggle.checked = !enabled;
       }
+    }
+  }
+  
+  /**
+   * Manually trigger widget generation for testing
+   */
+  private async triggerManualGeneration(): Promise<void> {
+    try {
+      logger.info('Popup', 'Manually triggering widget generation');
+      
+      const message = createMessage('TRIGGER_MANUAL_GENERATION', {}, 'background');
+      const response = await chrome.runtime.sendMessage(message);
+      
+      if (response.success) {
+        alert('Widget generation triggered! Check the background console for logs.');
+      } else {
+        alert(`Generation failed: ${response.error || 'Unknown error'}`);
+      }
+      
+    } catch (error) {
+      logger.error('Popup', 'Failed to trigger manual generation', error);
+      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+  
+  /**
+   * Open widget panel in active tab
+   */
+  private async openWidgetPanel(): Promise<void> {
+    try {
+      logger.info('Popup', 'Opening widget panel');
+      
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      
+      if (!tab.id) {
+        alert('No active tab found');
+        return;
+      }
+      
+      // Send message to content script to open panel
+      const message = createMessage('OPEN_WIDGET_PANEL', {}, 'content');
+      await chrome.tabs.sendMessage(tab.id, message);
+      
+      // Close popup
+      window.close();
+      
+    } catch (error) {
+      logger.error('Popup', 'Failed to open widget panel', error);
+      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }
